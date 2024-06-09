@@ -1,11 +1,16 @@
-FROM python:3.10
+FROM tiangolo/uvicorn-gunicorn-fastapi:python3.9
 
-WORKDIR /code
+ENV GIT_SSL_NO_VERIFY=1
+ENV PORT=5000
 
-COPY ./requirements.txt /code/requirements.txt
+COPY ./requirements.txt /app/requirements.txt
 
-RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt -q
+RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
 
-COPY ./app /code/app
+COPY ./app /app/app
+EXPOSE $PORT
 
-CMD ["fastapi", "run", "app/main.py", "--port", "80"]
+ARG APP_NAME
+ENV APP_NAME=${APP_NAME}
+ARG APP_VERSION
+ENV APP_VERSION=${APP_VERSION}

@@ -1,0 +1,39 @@
+version: '3.8'
+
+
+services:
+  web:
+    build: .
+    ports:
+      - 5000:5000
+    # depends_on:
+    #   - mongo
+    env_file:
+      - .env
+    environment:
+      - APP_NAME=townsnet_api
+      - APP_VERSION=dev
+    volumes:
+      - ./app:/app/app
+      - ./requirements.txt:/app/requirements.txt
+    command: /start-reload.sh
+
+  # mongo:
+  #   image: mongo
+  #   ports:
+  #     - 27017:27017
+  #   restart: always
+  #   environment:
+  #     MONGO_INITDB_ROOT_USERNAME: root
+  #     MONGO_INITDB_ROOT_PASSWORD: pass
+  #     MONGO_INITDB_DATABASE: geodb
+
+  # mongo-express:
+  #   image: mongo-express
+  #   restart: always
+  #   ports:
+  #     - 8089:8081
+  #   environment:
+  #     ME_CONFIG_MONGODB_ADMINUSERNAME: root
+  #     ME_CONFIG_MONGODB_ADMINPASSWORD: pass
+  #     ME_CONFIG_MONGODB_URL: mongodb://root:pass@mongo:27017/
