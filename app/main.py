@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 import numpy as np
 from pydantic import BaseModel
 from pydantic_geojson import PolygonModel, PointModel, FeatureCollectionModel, FeatureModel
-from townsnet import Region, Territory, Provision, ServiceType, Town
+from townsnet import Region, Territory, SERVICE_TYPES
 from fastapi import FastAPI, Query
 from enum import Enum
 import os
@@ -45,6 +45,7 @@ regions_dict = {
 #tags
 tags_metadata = [
     {"name": "Provision methods", "description": "Region provision assessment methods"},
+    {"name": "Layer methods", "description": "Region layers"},
     {"name": "Territory methods", "description": "Custom territory assessment"},
 ]
 
@@ -73,79 +74,69 @@ def get_region(region_id):
     region_data_path = os.path.join(data_path, str(region_id))
     return Region.from_pickle(os.path.join(region_data_path, f'{region_id}.pickle'))
 
-def get_provision(region_id, service_type_name):
+def get_provision(region_id, service_type_name = None):
     region_data_path = os.path.join(data_path, str(region_id))
     provisions_data_path = os.path.join(region_data_path, 'provisions')
+
+    def read_file(level):
+        if service_type_name is None:
+            return gpd.read_file(os.path.join(provisions_data_path, f'{level}.geojson'))
+        else:
+            return gpd.read_parquet(os.path.join(provisions_data_path, f'{service_type_name}_districts.parquet'))
+
     return {
-        t : gpd.read_parquet(os.path.join(provisions_data_path, f'{service_type_name}_{t}.parquet')) for t in ['districts', 'settlements', 'towns', 'links']
+        level : read_file for level in ['districts', 'settlements', 'towns']
     }
 
 @app.get("/")
 def read_root():
     return {
-        'hello': os.getcwd()
+        'hello': 'hiii'
     }
 
-# @app.post('/service_types')
-# def service_types() -> list[ServiceType]:
-#     return region.service_types
+@app.get('/service_types')
+def service_types() -> list[dict]:
+    return SERVICE_TYPES
 
 
-@app.get("/provision/region", tags=['Provision assessment'])
-def region_provision(
-    region_id : int = 1, 
-    service_type_name : str = 'school'
+@app.get("/layer/districts", tags=['Layer methods'])
+def districts_layer(
+    region_id : int = 1,
 ): # -> ProvisionModel:
-    gdf = get_provision(region_id, service_type_name)['districts']
+    gdf = get_provision(region_id)['districts']
     gdf = gdf.to_crs(4326)
     gdf.geometry = set_precision(gdf.geometry, grid_size=0.0001)
     gdf['district_id'] = gdf.index
-    return {
-        'provision': round(gdf.demand_within.sum() / gdf.demand.sum(),2),
-        'districts': json.loads(gdf.to_json())
-    }
+    return json.loads(gdf.to_json())
 
-@app.get("/provision/district", tags=['Provision assessment'])
-def district_provision(
+@app.get("/layer/settlements", tags=['Layer methods'])
+def settlements_layer(
     region_id : int = 1,
-    district_name : str = 'Бокситогорский муниципальный район',
-    service_type_name : str = 'school'
 ): # -> ProvisionModel:
-    gdf = get_provision(region_id, service_type_name)['settlements']
-    gdf = gdf[gdf.settlement_name == district_name]
+    gdf = get_provision(region_id)['settlements']
     gdf = gdf.to_crs(4326)
     gdf.geometry = set_precision(gdf.geometry, grid_size=0.0001)
     gdf['settlement_id'] = gdf.index
-    return {
-        'provision': round(gdf.demand_within.sum() / gdf.demand.sum(),2),
-        'districts': json.loads(gdf.to_json())
-    }
+    return json.loads(gdf.to_json())
 
-@app.get("/provision/settlement", tags=['Provision assessment'])
-def settlement_provision(
+@app.get("/layer/towns", tags=['Layer methods'])
+def towns_layer(
     region_id : int = 1,
-    settlement_name : str = 'Самойловское сельское поселение',
-    service_type_name : str = 'school'
 ): # -> ProvisionModel:
-    gdfs = get_provision(region_id, service_type_name)
+    gdf = get_provision(region_id)['towns']
+    gdf = gdf.to_crs(4326)
+    gdf.geometry = set_precision(gdf.geometry, grid_size=0.0001)
+    gdf['settlement_id'] = gdf.index
+    return json.loads(gdf.to_json())
 
-    towns_gdf = gdfs['towns']
-    towns_gdf = towns_gdf[towns_gdf.settlement_name == settlement_name]
-    towns_gdf = towns_gdf.to_crs(4326)
-    towns_gdf.geometry = set_precision(towns_gdf.geometry, grid_size=0.0001)
-    towns_gdf['town_id'] = towns_gdf.index
-    
-    links_gdf = gdfs['links']
-    links_gdf = links_gdf[links_gdf['from'].isin(towns_gdf.index)]
-    links_gdf = links_gdf[links_gdf['to'].isin(towns_gdf.index)]
-    links_gdf = links_gdf.to_crs(4326)
-    links_gdf.geometry = set_precision(links_gdf.geometry, grid_size=0.0001)
-
+@app.get('/provision/region', tags=['Provision methods'])
+def region_provision(region_id : int = 1, service_type_name : str = 'school'):
+    # service_type = list(filter(lambda st : st['name'] == service_type_name, SERVICE_TYPES))[0]
+    gdf = gpd.read_parquet(f'data/{region_id}/provisions/{service_type_name}_districts.parquet')
     return {
-        'provision': round(towns_gdf.demand_within.sum() / towns_gdf.demand.sum(),2),
-        'towns': json.loads(towns_gdf.to_json()),
-        'links': json.loads(links_gdf.to_json())
+        'provision': round(gdf.demand_within.sum() / gdf.demand.sum(),2)
     }
+
 
 @app.post("/polygon_assessment", tags=['Territory methods'])
 def polygon_assessment(polygon : PolygonModel, region_id : int = 1):
@@ -156,7 +147,7 @@ def polygon_assessment(polygon : PolygonModel, region_id : int = 1):
     }
     region = get_region(region_id)
     provisions = {
-        st : tuple(get_provision(region_id, st.name).values()) for st in region.service_types 
+        st : tuple(get_provision(region_id, st.name).values()) for st in region.service_types
     }
     gdf = gpd.GeoDataFrame.from_features([feature], crs=4326).to_crs(region.crs)
     series = gdf.iloc[0]
