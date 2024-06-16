@@ -1,4 +1,4 @@
-SOURCE_DIR = townsnet
+SOURCE_DIR = app
 
 lint:
 	pylint ${SOURCE_DIR}
@@ -8,22 +8,14 @@ format:
 	black ${SOURCE_DIR}
 
 install:
-	pip install .
+	pip install -r requirements.txt
 
 venv: #then source .venv/bin/activate
 	python3 -m venv .venv
 
-install-dev:
-	pip install -e '.[dev]'
+docker:
+	docker build -t townsnet_api .
+	docker run -it -p 80:80 townsnet_api
 
-build:
-	python3 -m build .
-
-clean:
-	rm -rf ./build ./dist ./townsnet.egg-info
-
-test:
-	pytest tests
-
-test-cov:
-	pytest tests --cov
+compose:
+	docker-compose -f docker-compose.dev.yml up --build

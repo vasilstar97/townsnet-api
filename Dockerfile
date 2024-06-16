@@ -1,16 +1,13 @@
-FROM tiangolo/uvicorn-gunicorn-fastapi:python3.9
+FROM tiangolo/uvicorn-gunicorn:python3.10
 
-ENV GIT_SSL_NO_VERIFY=1
-ENV PORT=5000
+LABEL maintainer="Sebastian Ramirez <tiangolo@gmail.com>"
 
-COPY ./requirements.txt /app/requirements.txt
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
+COPY ./app /app
 
-COPY ./app /app/app
-EXPOSE $PORT
-
-ARG APP_NAME
-ENV APP_NAME=${APP_NAME}
-ARG APP_VERSION
-ENV APP_VERSION=${APP_VERSION}
+# ARG APP_NAME
+# ENV APP_NAME=${APP_NAME}
+# ARG APP_VERSION
+# ENV APP_VERSION=${APP_VERSION}

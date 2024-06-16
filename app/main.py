@@ -27,22 +27,6 @@ regions_dict = {
   5188: 'Московская область',
 }
 
-# regions = {}
-# provisions = {}
-
-# for region_id in regions_dict.keys():
-#     region_data_path = f"{data_path}/{region_id}"
-#     region = Region.from_pickle(f"{region_data_path}/{region_id}.pickle")
-
-#     regions[region_id] = region
-#     provisions[region_id] = {}
-
-#     for service_type in region.service_types:
-#         provisions[region_id][service_type.name] = {
-#             t : gpd.read_parquet(f"{region_data_path}/provisions/{service_type.name}_{t}.parquet") for t in ['districts', 'settlements', 'towns', 'links']
-#         }
-
-#tags
 tags_metadata = [
     {"name": "Provision methods", "description": "Region provision assessment methods"},
     {"name": "Layer methods", "description": "Region layers"},
