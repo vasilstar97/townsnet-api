@@ -1,76 +1,16 @@
 import json
-import geopandas as gpd
-from typing import Annotated, Literal
+import math
+from fastapi import FastAPI
 import numpy as np
-from pydantic import BaseModel
-from pydantic_geojson import PolygonModel, PointModel, FeatureCollectionModel, FeatureModel
-from townsnet import Region, Territory, SERVICE_TYPES
-from fastapi import FastAPI, Query
-from enum import Enum
-import os
-from shapely import set_precision
+import pandas as pd
+from pydantic_geojson import PolygonModel
+from townsnet import SERVICE_TYPES, Territory
+from .utils import REGIONS_DICT, get_provision, get_region, process_output, process_territory
+from .models import *
 
-app = FastAPI() 
+app = FastAPI()
 
 #data initialization
-data_path = os.path.join(os.getcwd(), 'data')
-
-regions_dict = {
-  1: 'Ленинградская область',
-  3138: 'Санкт-Петербург',
-  3268: 'Москва',
-  3427: 'Волгоградская область',
-  3902: 'Тульская область',
-  4013: 'Омская область',
-  4437: 'Краснодарский край',
-  4882: 'Тюменская область',
-  5188: 'Московская область',
-}
-
-tags_metadata = [
-    {"name": "Provision methods", "description": "Region provision assessment methods"},
-    {"name": "Layer methods", "description": "Region layers"},
-    {"name": "Territory methods", "description": "Custom territory assessment"},
-] 
-
-class ProvisionPropertiesModel(BaseModel):
-    demand : float
-    demand_left : float
-    demand_within : float
-    demand_without : float
-    capacity : float
-    capacity_left : float
-    capacity_left : float
-    provision : float
-
-class ProvisionFeatureModel(FeatureModel):
-    geometry : PointModel
-    properties : ProvisionPropertiesModel
-
-class ProvisionModel(FeatureCollectionModel):
-    features : list[ProvisionFeatureModel]
-
-class AssessmentModel(BaseModel):
-    assessment : int
-    provisions : dict[str, ProvisionPropertiesModel]
-
-def get_region(region_id):
-    region_data_path = os.path.join(data_path, str(region_id))
-    return Region.from_pickle(os.path.join(region_data_path, f'{region_id}.pickle'))
-
-def get_provision(region_id, service_type_name = None):
-    region_data_path = os.path.join(data_path, str(region_id))
-    provisions_data_path = os.path.join(region_data_path, 'provisions')
-
-    def read_file(level):
-        if service_type_name is None:
-            return gpd.read_file(os.path.join(provisions_data_path, f'{level}.geojson'))
-        else:
-            return gpd.read_parquet(os.path.join(provisions_data_path, f'{service_type_name}_districts.parquet'))
-
-    return {
-        level : read_file for level in ['districts', 'settlements', 'towns']
-    }
 
 @app.get("/")
 def read_root():
@@ -78,66 +18,74 @@ def read_root():
         'hello': 'hiii'
     }
 
+@app.get('/regions')
+def regions() -> dict[int, str]:
+    return REGIONS_DICT
+
 @app.get('/service_types')
 def service_types() -> list[dict]:
     return SERVICE_TYPES
 
-
-@app.get("/layer/districts", tags=['Layer methods'])
-def districts_layer(
-    region_id : int = 1,
-): # -> ProvisionModel:
-    gdf = get_provision(region_id)['districts']
-    gdf = gdf.to_crs(4326)
-    gdf.geometry = set_precision(gdf.geometry, grid_size=0.0001)
-    gdf['district_id'] = gdf.index
-    return json.loads(gdf.to_json())
-
-@app.get("/layer/settlements", tags=['Layer methods'])
-def settlements_layer(
-    region_id : int = 1,
-): # -> ProvisionModel:
-    gdf = get_provision(region_id)['settlements']
-    gdf = gdf.to_crs(4326)
-    gdf.geometry = set_precision(gdf.geometry, grid_size=0.0001)
-    gdf['settlement_id'] = gdf.index
-    return json.loads(gdf.to_json())
-
-@app.get("/layer/towns", tags=['Layer methods'])
-def towns_layer(
-    region_id : int = 1,
-): # -> ProvisionModel:
-    gdf = get_provision(region_id)['towns']
-    gdf = gdf.to_crs(4326)
-    gdf.geometry = set_precision(gdf.geometry, grid_size=0.0001)
-    gdf['settlement_id'] = gdf.index
-    return json.loads(gdf.to_json())
-
 @app.get('/provision/region', tags=['Provision methods'])
 def region_provision(region_id : int = 1, service_type_name : str = 'school'):
-    # service_type = list(filter(lambda st : st['name'] == service_type_name, SERVICE_TYPES))[0]
-    gdf = gpd.read_parquet(f'data/{region_id}/provisions/{service_type_name}_districts.parquet')
+    gdf = get_provision(region_id, service_type_name)['districts']
     return {
         'provision': round(gdf.demand_within.sum() / gdf.demand.sum(),2)
     }
 
-
-@app.post("/polygon_assessment", tags=['Territory methods'])
-def polygon_assessment(polygon : PolygonModel, region_id : int = 1):
-    feature = {
-        'type': 'Feature',
-        'geometry' : polygon.model_dump(),
-        'properties': {}
-    }
+@app.post("/provision/territory", tags=['Provision methods', 'Territory methods'])
+@process_territory
+def territory_provision(polygon : PolygonModel, region_id : int = 1):
     region = get_region(region_id)
+    polygon_gdf = polygon.to_crs(region.crs)
+    territory = Territory(id=0, name='', geometry=polygon_gdf.iloc[0].geometry)
     provisions = {
-        st : tuple(get_provision(region_id, st.name).values()) for st in region.service_types
+        st : tuple([*get_provision(region_id, st.name).values(), None]) for st in region.service_types
     }
-    gdf = gpd.GeoDataFrame.from_features([feature], crs=4326).to_crs(region.crs)
-    series = gdf.iloc[0]
-    territory = Territory(id=0, name='0', geometry=series.geometry)
     indicators, assessment = territory.get_indicators(provisions)
+    indicators = indicators[~indicators.provision.isna()]
     return {
         'assessment': round(assessment),
-        'provisions': json.loads(indicators.to_json(orient='index'))
+        'provisions': indicators.provision.apply(lambda p : round(p,2)) #json.loads(indicators.to_json(orient='index'))
     }
+
+@app.get("/layer/districts", tags=['Layer methods'])
+@process_output
+def districts_layer(
+    region_id : int = 1,
+): # -> ProvisionModel:
+    return get_provision(region_id)['districts']
+
+@app.get("/layer/settlements", tags=['Layer methods'])
+@process_output
+def settlements_layer(
+    region_id : int = 1,
+): # -> ProvisionModel:
+    return get_provision(region_id)['settlements']
+
+@app.get("/layer/towns", tags=['Layer methods'])
+@process_output
+def towns_layer(
+    region_id : int = 1,
+): # -> ProvisionModel:
+    return get_provision(region_id)['towns']
+
+@app.post("/layer/territory", tags=['Layer methods', 'Territory methods'])
+@process_output
+@process_territory
+def territory_layer(
+    polygon : PolygonModel,
+    region_id : int = 1,
+): # -> ProvisionModel:
+    region = get_region(region_id)
+    polygon_gdf = polygon.to_crs(region.crs)
+    territory = Territory(id=0, name='', geometry=polygon_gdf.iloc[0].geometry)
+    
+    gdfs = []
+    for service_type in region.service_types:
+        t_gdf = get_provision(region_id, service_type.name)['towns']
+        gdf, _ = territory.get_context_provision(service_type, t_gdf)
+        gdf = gdf[['geometry', 'provision']].rename(columns={'provision': f'provision_{service_type.name}'})
+        gdfs.append(gdf)
+
+    return pd.concat(gdfs)

@@ -7,4 +7,3 @@ build.sh
 
 venv/
 .venv/
-app/data/
