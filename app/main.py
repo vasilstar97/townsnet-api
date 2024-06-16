@@ -10,7 +10,7 @@ from enum import Enum
 import os
 from shapely import set_precision
 
-app = FastAPI()
+app = FastAPI() 
 
 #data initialization
 data_path = os.path.join(os.getcwd(), 'data')
@@ -31,7 +31,7 @@ tags_metadata = [
     {"name": "Provision methods", "description": "Region provision assessment methods"},
     {"name": "Layer methods", "description": "Region layers"},
     {"name": "Territory methods", "description": "Custom territory assessment"},
-]
+] 
 
 class ProvisionPropertiesModel(BaseModel):
     demand : float

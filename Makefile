@@ -13,9 +13,5 @@ install:
 venv: #then source .venv/bin/activate
 	python3 -m venv .venv
 
-docker:
-	docker build -t townsnet_api .
-	docker run -it -p 80:80 townsnet_api
-
-compose:
-	docker-compose -f docker-compose.dev.yml up --build
+compose-dev:
+	docker compose -f "docker-compose.dev.yml" up --build
