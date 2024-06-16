@@ -80,12 +80,13 @@ def territory_layer(
     region = get_region(region_id)
     polygon_gdf = polygon.to_crs(region.crs)
     territory = Territory(id=0, name='', geometry=polygon_gdf.iloc[0].geometry)
-    
-    gdfs = []
+    res_gdf = region.get_towns_gdf()[['geometry', 'town_name']]
     for service_type in region.service_types:
         t_gdf = get_provision(region_id, service_type.name)['towns']
         gdf, _ = territory.get_context_provision(service_type, t_gdf)
-        gdf = gdf[['geometry', 'provision']].rename(columns={'provision': f'provision_{service_type.name}'})
-        gdfs.append(gdf)
+        res_gdf[f'provision_{service_type.name}'] = gdf['provision']
 
-    return pd.concat(gdfs)
+    res_gdf['keep'] = res_gdf[filter(lambda c : 'provision' in c, res_gdf.columns)].isna().apply(lambda s : not s.all(), axis=1)
+    res_gdf = res_gdf[res_gdf['keep']]
+    res_gdf = res_gdf[['geometry', *filter(lambda c : 'provision' in c,res_gdf.columns)]]
+    return res_gdf
