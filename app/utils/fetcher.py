@@ -53,7 +53,7 @@ def provision_exists(region_id : int, service_type_name : str):
     exists = []
     for admin_level in ADMIN_LEVELS:
         file_path = os.path.join(data_path, f'{service_type_name}_{admin_level}.parquet')
-        os.path.exists(file_path)
+        exists.append(os.path.exists(file_path))
     return all(exists)
 
 def get_provision(region_id : int, service_type_name : str = None):
