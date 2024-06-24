@@ -1,8 +1,6 @@
-import json
-import math
-from fastapi import FastAPI
-import numpy as np
-import pandas as pd
+from fastapi import FastAPI, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from pydantic_geojson import PolygonModel
 from townsnet import SERVICE_TYPES, Territory
 from .utils import REGIONS_DICT, get_provision, get_region, process_output, process_territory
@@ -10,7 +8,14 @@ from .models import *
 
 app = FastAPI()
 
-#data initialization
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex='http://.*',
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.add_middleware(GZipMiddleware, minimum_size=100)
 
 @app.get("/")
 def read_root():
@@ -27,7 +32,7 @@ def service_types() -> list[dict]:
     return SERVICE_TYPES
 
 @app.get('/provision/region', tags=['Provision methods'])
-def region_provision(region_id : int = 1, service_type_name : str = 'school'):
+def region_provision(region_id : int = Query(example=1), service_type_name : str = Query(example='school')):
     gdf = get_provision(region_id, service_type_name)['districts']
     return {
         'provision': round(gdf.demand_within.sum() / gdf.demand.sum(),2)
@@ -35,7 +40,7 @@ def region_provision(region_id : int = 1, service_type_name : str = 'school'):
 
 @app.post("/provision/territory", tags=['Provision methods', 'Territory methods'])
 @process_territory
-def territory_provision(polygon : PolygonModel, region_id : int = 1):
+def territory_provision(polygon : PolygonModel, region_id : int = Query(example=1)):
     region = get_region(region_id)
     polygon_gdf = polygon.to_crs(region.crs)
     territory = Territory(id=0, name='', geometry=polygon_gdf.iloc[0].geometry)
@@ -52,21 +57,21 @@ def territory_provision(polygon : PolygonModel, region_id : int = 1):
 @app.get("/layer/districts", tags=['Layer methods'])
 @process_output
 def districts_layer(
-    region_id : int = 1,
+    region_id : int = Query(example=1)
 ): # -> ProvisionModel:
     return get_provision(region_id)['districts']
 
 @app.get("/layer/settlements", tags=['Layer methods'])
 @process_output
 def settlements_layer(
-    region_id : int = 1,
+    region_id : int = Query(example=1)
 ): # -> ProvisionModel:
     return get_provision(region_id)['settlements']
 
 @app.get("/layer/towns", tags=['Layer methods'])
 @process_output
 def towns_layer(
-    region_id : int = 1,
+    region_id : int = Query(example=1)
 ): # -> ProvisionModel:
     return get_provision(region_id)['towns']
 
@@ -75,7 +80,7 @@ def towns_layer(
 @process_territory
 def territory_layer(
     polygon : PolygonModel,
-    region_id : int = 1,
+    region_id : int = Query(example=1)
 ): # -> ProvisionModel:
     region = get_region(region_id)
     polygon_gdf = polygon.to_crs(region.crs)
