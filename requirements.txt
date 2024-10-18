@@ -1,4 +1,7 @@
-townsnet==0.0.4
+townsnet @ git+https://github.com/vasilstar97/townsnet.git@develop
+# townsnet==0.0.4
 fastapi>=0.111.0,<0.113.0
 pydantic>=2.0.0,<3.0.0
 pydantic-geojson==0.1.1
+loguru
+requests-async

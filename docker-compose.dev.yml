@@ -9,7 +9,7 @@ services:
     # depends_on:
     #   - mongo
     env_file:
-      - .env
+      - dev.env
     environment:
       - APP_NAME=townsnet_api
       - APP_VERSION=dev
