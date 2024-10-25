@@ -5,17 +5,22 @@ import geopandas as gpd
 DEFAULT_CRS = 4326
 URBAN_API = 'http://10.32.1.107:5300'
 
-async def get_territories(parent_id : int | None = None, all_levels = False, geometry : bool = False) -> pd.DataFrame:
+async def get_territories(parent_id : int | None = None, all_levels = False, geometry : bool = False) -> pd.DataFrame | gpd.GeoDataFrame:
   res = await ra.get(URBAN_API + f'/api/v1/all_territories{"" if geometry else "_without_geometry"}', {
     'parent_id': parent_id,
     'get_all_levels': all_levels
   })
-  return pd.DataFrame(res.json()).set_index('territory_id', drop=True)
+  res_json = res.json()
+  if geometry:
+    gdf = gpd.GeoDataFrame.from_features(res_json, crs=DEFAULT_CRS)
+    return gdf.set_index('territory_id', drop=True)
+  df = pd.DataFrame(res_json)
+  return df.set_index('territory_id', drop=True)
 
-async def get_regions():
+async def get_regions(geometry : bool = False) -> gpd.GeoDataFrame:
   countries = await get_territories()
   countries_ids = countries.index
-  countries_regions = [await get_territories(country_id) for country_id in countries_ids]
+  countries_regions = [await get_territories(country_id, geometry=geometry) for country_id in countries_ids]
   return pd.concat(countries_regions)
 
 # async def get_region_territories(region_id : int) -> dict[int, gpd.GeoDataFrame]:
