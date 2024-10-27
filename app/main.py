@@ -5,10 +5,16 @@ from fastapi.middleware.gzip import GZipMiddleware
 from pydantic_geojson import PolygonModel
 # from townsnet import SERVICE_TYPES, Territory
 # from .utils import REGIONS_DICT, get_provision, get_region, process_output, process_territory
+from .utils import urban_api
 from .models import *
-from .routers import region
+from .routers import provision, engineering
 
-app = FastAPI()
+app = FastAPI(
+    title='TownsNet API',
+    description='API providing methods for regions provisions assessment and other stuff.'
+)
+
+# app.on_event('start_up')
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,12 +29,14 @@ app.add_middleware(GZipMiddleware, minimum_size=100)
 async def read_root():
     return RedirectResponse('/docs')
 
-app.include_router(region.router)
+@app.get('/regions', tags=['Utils'])
+async def regions() -> dict[int, str]:
+    regions = await urban_api.get_regions()
+    return {i : regions.loc[i,'name'] for i in regions.index}
 
+app.include_router(provision.router)
+app.include_router(engineering.router)
 
-# @app.get('/regions')
-# def regions() -> dict[int, str]:
-#     return REGIONS_DICT
 
 # @app.get('/service_types')
 # def service_types() -> list[dict]:

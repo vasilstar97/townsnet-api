@@ -22,7 +22,6 @@ def gdf_to_geojson(func):
     async def process(*args, **kwargs):
         gdf = (await func(*args, **kwargs)).to_crs(4326)
         gdf.geometry = set_precision(gdf.geometry, grid_size=PRECISION_GRID_SIZE)
-        # gdf['id'] = gdf.index
         # for column in filter(lambda c : 'provision' in c, gdf):
         #     gdf[column] = gdf[column].apply(lambda p : round(p,2))
         return json.loads(gdf.to_json())
