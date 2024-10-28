@@ -101,7 +101,7 @@ async def get_levels(region_id : int) -> dict[int, str]:
 @router.get('/{region_id}/aggregate')
 # @decorators.gdf_to_geojson
 async def aggregate(region_id : int, level : int, regional_scenario_id : int | None = None) -> dict[int, dict[int, int]]:
-    engineering_model = _prepare_model(region_id)
-    units = _prepare_units(region_id, level)
-    agg = (await engineering_model).aggregate(await units)
+    engineering_model = await _prepare_model(region_id)
+    units = await _prepare_units(region_id, level)
+    agg = engineering_model.aggregate(units)
     return {i : {ENG_OBJ_INDICATOR[eng_obj] : agg.loc[i, eng_obj.value] for eng_obj in list(EngineeringObject)} for i in agg.index}
