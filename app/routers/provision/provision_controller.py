@@ -2,13 +2,17 @@ import geopandas as gpd
 import pandas as pd
 import os
 from loguru import logger
-from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException, Depends
 from townsnet.provision.service_type import ServiceType, Category, SupplyType
 from townsnet.provision.provision_model import ProvisionModel
-from ..utils import urban_api, decorators
+from ...utils import urban_api, decorators
+from ...utils.const import DATA_PATH
 
-DATA_PATH = os.path.abspath('app/data')
+async def on_startup():
+    ...
+
+async def on_shutdown():
+    ...
 
 router = APIRouter(prefix='/provision', tags=['Provision assessment'])
 

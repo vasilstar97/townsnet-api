@@ -1,23 +1,8 @@
 import pandas as pd
 import geopandas as gpd
-import functools
-from pydantic import BaseModel, Field
-from fastapi import APIRouter, HTTPException, Depends
 from townsnet.engineering.engineering_model import EngineeringModel, EngineeringObject
-from pydantic_geojson import FeatureCollectionModel
-from ..utils import urban_api, decorators
-
-router = APIRouter(prefix='/engineering', tags=['Engineering assessment'])
-
-class PhysicalObjectType(BaseModel):
-    physical_object_type_id : int
-    name : str
-
-class Indicator(BaseModel):
-    indicator_id : int
-    name_full : str
-    name_short : str
-    physical_objects_types : list[PhysicalObjectType]
+from ...utils import urban_api
+from .engineering_models import Indicator, PhysicalObjectType
 
 ENG_OBJ_POTS = {
     EngineeringObject.ENGINEERING_OBJECT: [],
@@ -29,15 +14,15 @@ ENG_OBJ_POTS = {
 }
 
 ENG_OBJ_INDICATOR = {
-  EngineeringObject.ENGINEERING_OBJECT : 88,
-  EngineeringObject.POWER_PLANTS : 89,
-  EngineeringObject.WATER_INTAKE : 90,
-  EngineeringObject.WATER_TREATMENT : 91,
-  EngineeringObject.WATER_RESERVOIR : 92,
-  EngineeringObject.GAS_DISTRIBUTION : 93
+    EngineeringObject.ENGINEERING_OBJECT : 88,
+    EngineeringObject.POWER_PLANTS : 89,
+    EngineeringObject.WATER_INTAKE : 90,
+    EngineeringObject.WATER_TREATMENT : 91,
+    EngineeringObject.WATER_RESERVOIR : 92,
+    EngineeringObject.GAS_DISTRIBUTION : 93
 }
 
-async def _prepare_model(region_id : int) -> EngineeringModel:
+async def fetch_engineering_model(region_id : int) -> EngineeringModel:
     eng_objs_queries = {}
     #sending queries
     for eng_obj, pots_ids in ENG_OBJ_POTS.items():
@@ -54,10 +39,9 @@ async def _prepare_model(region_id : int) -> EngineeringModel:
             queries_gdfs = [await query for query in queries]
             gdf = pd.concat(queries_gdfs)
             gdfs[eng_obj] = gdf
-
     return EngineeringModel(gdfs)
 
-async def _prepare_units(region_id : int, level : int) -> gpd.GeoDataFrame:
+async def fetch_units(region_id : int, level : int) -> gpd.GeoDataFrame:
     if level == 2: #return region gdf
         territories_gdf = await urban_api.get_regions(True)
         territories_gdf = territories_gdf[territories_gdf.index == region_id]
@@ -66,7 +50,18 @@ async def _prepare_units(region_id : int, level : int) -> gpd.GeoDataFrame:
         territories_gdf = territories_gdf[territories_gdf['level'] == level]
     return territories_gdf
 
-@router.get('/indicators')
+async def get_levels(region_id : int) -> dict[int, str]:
+    regions = await urban_api.get_regions()
+    territories_gdf = await urban_api.get_territories(region_id, all_levels = True)
+    levels = {
+        2 : regions.loc[region_id, 'territory_type']['name']
+    }
+    for level, gdf in territories_gdf.groupby('level'):
+        gdf['territory_type_name'] = gdf['territory_type'].apply(lambda tt : tt['name'])
+        ttn = max(gdf['territory_type_name'].unique(), key=lambda ttn : len(gdf[gdf['territory_type_name'] == ttn]))
+        levels[level] = ttn
+    return levels
+
 async def get_indicators() -> list[Indicator]:
     indicators_pots = {ENG_OBJ_INDICATOR[eng_obj]: ENG_OBJ_POTS[eng_obj] for eng_obj in list(EngineeringObject)}
     indicators_df = pd.DataFrame(await urban_api.get_indicators()).set_index('indicator_id')
@@ -85,23 +80,7 @@ async def get_indicators() -> list[Indicator]:
         indicators.append(indicator)
     return indicators
 
-@router.get('/{region_id}/levels')
-async def get_levels(region_id : int) -> dict[int, str]:
-    regions = await urban_api.get_regions()
-    territories_gdf = await urban_api.get_territories(region_id, all_levels = True)
-    levels = {
-        2 : regions.loc[region_id, 'territory_type']['name']
-    }
-    for level, gdf in territories_gdf.groupby('level'):
-        gdf['territory_type_name'] = gdf['territory_type'].apply(lambda tt : tt['name'])
-        ttn = max(gdf['territory_type_name'].unique(), key=lambda ttn : len(gdf[gdf['territory_type_name'] == ttn]))
-        levels[level] = ttn
-    return levels
-
-@router.get('/{region_id}/aggregate')
-# @decorators.gdf_to_geojson
-async def aggregate(region_id : int, level : int, regional_scenario_id : int | None = None) -> dict[int, dict[int, int]]:
-    engineering_model = await _prepare_model(region_id)
-    units = await _prepare_units(region_id, level)
+def aggregate(engineering_model : EngineeringModel, units : gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     agg = engineering_model.aggregate(units)
-    return {i : {ENG_OBJ_INDICATOR[eng_obj] : agg.loc[i, eng_obj.value] for eng_obj in list(EngineeringObject)} for i in agg.index}
+    return agg
+    # return {i : {ENG_OBJ_INDICATOR[eng_obj] : agg.loc[i, eng_obj.value] for eng_obj in list(EngineeringObject)} for i in agg.index}

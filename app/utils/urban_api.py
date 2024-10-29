@@ -65,7 +65,7 @@ async def get_regions(geometry : bool = False) -> gpd.GeoDataFrame:
     countries = await get_territories()
     countries_ids = countries.index
     countries_regions = [await get_territories(country_id, geometry=geometry) for country_id in countries_ids]
-    return pd.concat(countries_regions) 
+    return pd.concat(countries_regions)
 
 async def get_service_types(territory_id : int) -> list[dict]:
     res = await ra.get(URBAN_API + f'/api/v1/territory/{territory_id}/service_types')
@@ -79,7 +79,7 @@ async def get_normative_service_types(territory_id : int) -> dict[int, ServiceTy
     #prepare service types
     service_types = pd.DataFrame(await get_service_types(territory_id)).set_index('service_type_id')
     service_types['weight'] = service_types['properties'].apply(lambda p : p['weight_value'] if 'weight_value' in p else 0)
-    service_types['category'] = service_types['infrastructure_type'].apply(str.upper)
+    service_types['category'] = service_types['infrastructure_type']
     #prepare normatives
     normatives = pd.DataFrame(await get_normatives(territory_id))
     normatives['service_type_id'] = normatives['service_type'].apply(lambda st : st['id'])

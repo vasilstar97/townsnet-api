@@ -1,5 +1,9 @@
 SOURCE_DIR = app
 
+update-tn:
+	pip uninstall townsnet
+	pip install -r requirements.txt
+
 lint:
 	pylint ${SOURCE_DIR}
 
