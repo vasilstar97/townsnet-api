@@ -50,7 +50,7 @@ async def fetch_units(region_id : int, level : int) -> gpd.GeoDataFrame:
         territories_gdf = territories_gdf[territories_gdf['level'] == level]
     return territories_gdf
 
-async def get_levels(region_id : int) -> dict[int, str]:
+async def fetch_levels(region_id : int) -> dict[int, str]:
     regions = await urban_api.get_regions()
     territories_gdf = await urban_api.get_territories(region_id, all_levels = True)
     levels = {

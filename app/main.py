@@ -14,11 +14,11 @@ controllers = [engineering_controller, provision_controller]
 
 async def on_startup():
     for controller in controllers:
-        controller.on_startup()
+        await controller.on_startup()
 
 async def on_shutdown():
     for controller in controllers:
-        controller.on_shutdown()
+        await controller.on_shutdown()
 
 @asynccontextmanager
 async def lifespan(router : FastAPI):

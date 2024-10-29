@@ -11,10 +11,10 @@ class Indicator(BaseModel):
     name_short : str
     physical_objects_types : list[PhysicalObjectType]
 
-class IndicatorsValuesModel(FeatureCollectionModel):
+class EngineeringModel(FeatureCollectionModel):
     
-    class IndicatorsValuesFeature(FeatureModel):
+    class EngineeringFeature(FeatureModel):
         geometry : PolygonModel | MultiPolygonModel
         properties : dict[str, int]
     
-    features : list[IndicatorsValuesFeature]
+    features : list[EngineeringFeature]

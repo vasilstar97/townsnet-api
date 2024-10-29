@@ -20,12 +20,12 @@ async def get_indicators() -> list[engineering_models.Indicator]:
 
 @router.get('/{region_id}/levels')
 async def get_levels(region_id : int) -> dict[int, str]:
-    levels = await engineering_service.get_levels(region_id)
+    levels = await engineering_service.fetch_levels(region_id)
     return levels
 
-@router.get('/{region_id}/get_indicators_values')
+@router.get('/{region_id}/get_evaluation')
 @decorators.gdf_to_geojson
-async def get_indicators_values(region_id : int, level : int) -> engineering_models.IndicatorsValuesModel :
+async def get_evaluation(region_id : int, level : int) -> engineering_models.EngineeringModel :
     engineering_model = await engineering_service.fetch_engineering_model(region_id)
     units = await engineering_service.fetch_units(region_id, level)
     return engineering_service.aggregate(engineering_model, units)

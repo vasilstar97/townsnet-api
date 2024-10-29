@@ -3,7 +3,6 @@ import json
 import requests_async as ra
 import pandas as pd
 import geopandas as gpd
-from townsnet.provision.service_type import ServiceType
 
 DEFAULT_CRS = 4326
 URBAN_API = 'http://10.32.1.107:5300'
@@ -52,14 +51,14 @@ async def get_territories_population(territories_gdf : gpd.GeoDataFrame, regiona
     res_df = pd.DataFrame(res.json())
     res_df = res_df[res_df['territory_id'].isin(territories_gdf.index)]
     res_df = res_df.groupby('territory_id').agg({'value': 'last'}).rename(columns={'value':'population'})
-    return territories_gdf[['geometry']].merge(res_df, left_index=True, right_index=True)
+    return territories_gdf[['geometry']].merge(res_df, how='left', left_index=True, right_index=True)
 
 async def get_service_type_capacities(territory_id : int, level : int, service_type_id : int) -> list[dict[str, int]]:
     res = await ra.get(URBAN_API + f'/api/v1/territory/{territory_id}/services_capacity', {
         'level': level,
         'service_type_id': service_type_id
     })
-    return pd.DataFrame(res.json()).set_index('territory_id')
+    return res.json()
 
 async def get_regions(geometry : bool = False) -> gpd.GeoDataFrame:
     countries = await get_territories()
@@ -74,18 +73,6 @@ async def get_service_types(territory_id : int) -> list[dict]:
 async def get_normatives(territory_id : int) -> list[dict]:
     res = await ra.get(URBAN_API + f'/api/v1/territory/{territory_id}/normatives')
     return res.json()
-
-async def get_normative_service_types(territory_id : int) -> dict[int, ServiceType]:
-    #prepare service types
-    service_types = pd.DataFrame(await get_service_types(territory_id)).set_index('service_type_id')
-    service_types['weight'] = service_types['properties'].apply(lambda p : p['weight_value'] if 'weight_value' in p else 0)
-    service_types['category'] = service_types['infrastructure_type']
-    #prepare normatives
-    normatives = pd.DataFrame(await get_normatives(territory_id))
-    normatives['service_type_id'] = normatives['service_type'].apply(lambda st : st['id'])
-    #merge one another
-    service_types_instances = ServiceType.initialize_service_types(service_types, normatives)
-    return {sti.id : sti for sti in service_types_instances}
 
 async def get_physical_objects_types() -> list[dict]:
     res = await ra.get(URBAN_API + '/api/v1/physical_object_types')
