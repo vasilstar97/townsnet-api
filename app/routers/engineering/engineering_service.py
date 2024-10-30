@@ -1,7 +1,7 @@
 import pandas as pd
 import geopandas as gpd
 from townsnet.engineering.engineering_model import EngineeringModel, EngineeringObject
-from ...utils import urban_api
+from ...utils import api_client
 from .engineering_models import Indicator, PhysicalObjectType
 
 ENG_OBJ_POTS = {
@@ -28,7 +28,7 @@ async def fetch_engineering_model(region_id : int) -> EngineeringModel:
     for eng_obj, pots_ids in ENG_OBJ_POTS.items():
         eng_obj_queries = []
         for pot_id in pots_ids:
-            pot_query = urban_api.get_physical_objects(region_id, pot_id)
+            pot_query = api_client.get_physical_objects(region_id, pot_id)
             eng_obj_queries.append(pot_query)
         if len(eng_obj_queries) > 0:
             eng_objs_queries[eng_obj] = eng_obj_queries
@@ -43,16 +43,16 @@ async def fetch_engineering_model(region_id : int) -> EngineeringModel:
 
 async def fetch_units(region_id : int, level : int) -> gpd.GeoDataFrame:
     if level == 2: #return region gdf
-        territories_gdf = await urban_api.get_regions(True)
+        territories_gdf = await api_client.get_regions(True)
         territories_gdf = territories_gdf[territories_gdf.index == region_id]
     else: #return certain gdf
-        territories_gdf = await urban_api.get_territories(region_id, all_levels = True, geometry=True)
+        territories_gdf = await api_client.get_territories(region_id, all_levels = True, geometry=True)
         territories_gdf = territories_gdf[territories_gdf['level'] == level]
     return territories_gdf
 
 async def fetch_levels(region_id : int) -> dict[int, str]:
-    regions = await urban_api.get_regions()
-    territories_gdf = await urban_api.get_territories(region_id, all_levels = True)
+    regions = await api_client.get_regions()
+    territories_gdf = await api_client.get_territories(region_id, all_levels = True)
     levels = {
         2 : regions.loc[region_id, 'territory_type']['name']
     }
@@ -64,8 +64,8 @@ async def fetch_levels(region_id : int) -> dict[int, str]:
 
 async def get_indicators() -> list[Indicator]:
     indicators_pots = {ENG_OBJ_INDICATOR[eng_obj]: ENG_OBJ_POTS[eng_obj] for eng_obj in list(EngineeringObject)}
-    indicators_df = pd.DataFrame(await urban_api.get_indicators()).set_index('indicator_id')
-    physical_objects_types_df = pd.DataFrame(await urban_api.get_physical_objects_types()).set_index('physical_object_type_id')
+    indicators_df = pd.DataFrame(await api_client.get_indicators()).set_index('indicator_id')
+    physical_objects_types_df = pd.DataFrame(await api_client.get_physical_objects_types()).set_index('physical_object_type_id')
     indicators = []
     for ind_id, pots_array in indicators_pots.items():
         physical_objects_types = [PhysicalObjectType(

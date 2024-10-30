@@ -51,7 +51,7 @@ async def get_evaluation(region_id : int, level : int | None = None, category : 
 
     # aggregate service types provisions if needed
     if len(service_types) > 1:
-        provision = provision_service.merge_provisions(provisions)
+        provision = provision_service.merge_provisions(provisions, service_types)
     else:
         provision = list(provisions.values())[0]
 

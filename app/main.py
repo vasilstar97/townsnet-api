@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 # from townsnet import SERVICE_TYPES, Territory
 # from .utils import REGIONS_DICT, get_provision, get_region, process_output, process_territory
-from .utils import urban_api
+from .utils import api_client
 from .routers.engineering import engineering_controller
 from .routers.provision import provision_controller
 from loguru import logger
@@ -47,7 +47,7 @@ async def read_root():
 
 @app.get('/regions', tags=['Utils'])
 async def regions() -> dict[int, str]:
-    regions_df = await urban_api.get_regions()
+    regions_df = await api_client.get_regions()
     return {i : regions_df.loc[i,'name'] for i in regions_df.index}
 
 app.include_router(provision_controller.router)

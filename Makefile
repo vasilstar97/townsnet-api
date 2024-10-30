@@ -1,5 +1,8 @@
 SOURCE_DIR = app
 
+fastapi:
+	fastapi run --reload
+
 update-tn:
 	pip uninstall townsnet
 	pip install -r requirements.txt

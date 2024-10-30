@@ -1,3 +1,4 @@
+import os
 import shapely
 import json
 import requests_async as ra
@@ -5,9 +6,18 @@ import pandas as pd
 import geopandas as gpd
 
 DEFAULT_CRS = 4326
-URBAN_API = 'http://10.32.1.107:5300'
+URBAN_API = os.environ['URBAN_API'] if 'URBAN_API' in os.environ else 'http://10.32.1.107:5300' 
+TRANSPORT_FRAMES_API = os.environ['TRANSPORT_FRAMES_API'] if 'TRANSPORT_FRAMES_API' in os.environ else "http://10.32.1.65:5700" 
 PAGE_SIZE = 10_000
 POPULATION_COUNT_INDICATOR_ID = 1
+GRAPH_TYPE = 'inter'
+
+async def get_accessibility_matrix(region_id : int):
+    res = await ra.get(f'{TRANSPORT_FRAMES_API}/api_v1/{region_id}/get_matrix', {
+        'graph_type': GRAPH_TYPE
+    })
+    res_json = res.json()
+    return pd.DataFrame(res_json['values'], index=res_json['index'], columns=res_json['columns'])
 
 async def _get_physical_objects(region_id : int, pot_id : int, page : int, page_size : int = PAGE_SIZE):
     res = await ra.get(f'{URBAN_API}/api/v1/territory/{region_id}/physical_objects_with_geometry', {
