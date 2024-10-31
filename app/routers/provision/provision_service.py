@@ -3,12 +3,16 @@ import numpy as np
 import geopandas as gpd
 import pandas as pd
 from statistics import mean
+from loguru import logger
 from townsnet.provision.service_type import ServiceType, SupplyType
 from townsnet.provision.provision_model import ProvisionModel
 from ...utils import api_client
 from ...utils.const import DATA_PATH
 
 async def fetch_service_types(region_id : int) -> dict[int, ServiceType]:
+    """
+    Fetch region specific service types with normatives
+    """
     #prepare service types
     service_types = pd.DataFrame(await api_client.get_service_types(region_id)).set_index('service_type_id')
     service_types['weight'] = service_types['properties'].apply(lambda p : p['weight_value'] if 'weight_value' in p else 0)
@@ -20,11 +24,14 @@ async def fetch_service_types(region_id : int) -> dict[int, ServiceType]:
     service_types_instances = ServiceType.initialize_service_types(service_types, normatives)
     return {sti.id : sti for sti in service_types_instances}
 
-async def fetch_territories(region_id : int, population : bool = True, geometry = True) -> tuple[dict[int, gpd.GeoDataFrame], gpd.GeoDataFrame]:
+async def fetch_territories(region_id : int, regional_scenario_id : int | None = None, population : bool = True, geometry = True) -> tuple[dict[int, gpd.GeoDataFrame], gpd.GeoDataFrame]:
+    """
+    Fetch region territories for specific regional_scenario with population (optional) and geometry (optional)
+    """
     # fetch region
-    # regions = await api_client.get_regions(True)
-    # region_gdf = regions[regions.index == region_id]
-    units_gdfs = {}
+    regions_gdf = await api_client.get_regions(True)
+    region_gdf = regions_gdf[regions_gdf.index == region_id]
+    units_gdfs = {2 : region_gdf}
     # fetch towns
     territories_gdf = await api_client.get_territories(region_id, all_levels = True, geometry=geometry)
     territories_gdf['was_point'] = territories_gdf['properties'].apply(lambda p : p['was_point'] if 'was_point' in p else False)
@@ -42,7 +49,10 @@ async def fetch_territories(region_id : int, population : bool = True, geometry 
     return units_gdfs, towns_gdf
 
 async def fetch_levels(region_id : int) -> dict[int, str]:
-    units_gdfs, _ = await fetch_territories(region_id, False, False)
+    """
+    Fetch region levels
+    """
+    units_gdfs, _ = await fetch_territories(region_id, population=False, geometry=False)
     levels = {}
     for level, gdf in units_gdfs.items():
         gdf['territory_type_name'] = gdf['territory_type'].apply(lambda tt : tt['name'])
@@ -51,6 +61,9 @@ async def fetch_levels(region_id : int) -> dict[int, str]:
     return levels
 
 async def fetch_acc_mx(region_id : int, regional_scenario_id : int | None = None) -> pd.DataFrame:
+    """
+    Fetch region accessibility matrix from Transport Frames
+    """
     acc_mx = await api_client.get_accessibility_matrix(region_id)
     return acc_mx
 
@@ -69,13 +82,6 @@ async def fetch_supplies(region_id : int, service_type : ServiceType):
         supplies_df['supply'] = supplies_df['count']
     return supplies_df
 
-async def evaluate(provision_model : ProvisionModel, region_id : int, service_type : ServiceType, units_gdf : gpd.GeoDataFrame | None):
-    supplies_df = await fetch_supplies(region_id, service_type)
-    provision = provision_model.calculate(supplies_df, service_type)
-    if units_gdf is not None:
-        return provision_model.agregate(provision, units_gdf)
-    return provision
-
 def merge_provisions(provisions : dict[int, gpd.GeoDataFrame], service_types : list[ServiceType]):
     provision = list(provisions.values())[0][['geometry']].copy()
     for st in service_types:
@@ -84,3 +90,49 @@ def merge_provisions(provisions : dict[int, gpd.GeoDataFrame], service_types : l
     provision['provision'] = provision.apply(lambda s : mean([s[st.name] for st in service_types if not np.isnan(s[st.name])]), axis=1)
     print(provision)
     return provision
+
+def _get_file_path(region_id : int, service_type_id : int, regional_scenario_id : int | None = None):
+    file_path = f'{region_id}_{service_type_id}'
+    if regional_scenario_id is not None:
+        file_path = f'{file_path}_{regional_scenario_id}'
+    return os.path.join(DATA_PATH, f'{file_path}.parquet')
+
+async def _exists(region_id : int, service_type_id : int, regional_scenario_id : int | None = None):
+    return os.path.exists(_get_file_path(region_id, service_type_id, regional_scenario_id))
+
+async def _load(region_id : int, service_type_id : int, regional_scenario_id : int | None = None):
+    file_path = _get_file_path(region_id, service_type_id, regional_scenario_id)
+    return gpd.read_parquet(file_path)
+
+async def _save(provision_gdf : gpd.GeoDataFrame, region_id : int, service_type_id : int, regional_scenario_id : int | None = None):
+    file_path = _get_file_path(region_id, service_type_id, regional_scenario_id)
+    provision_gdf.to_parquet(file_path)
+
+async def evaluate_and_save(region_id : int, regional_scenario_id : int | None = None):
+    logger.info(f'Fetching {region_id} region service types')
+    region_service_types = await fetch_service_types(region_id)
+    candidate_service_types = []
+    for service_type_id, service_type in region_service_types.items():
+        # если сервиса не существует, добавляем его в кандидаты на вычисление
+        if not await _exists(region_id, service_type_id, regional_scenario_id):
+            candidate_service_types.append(service_type)
+    if len(candidate_service_types) == 0:
+        logger.success('All service types are evaluated')
+        return
+    # инициализируем модельку
+    logger.info(f'Initializing {region_id} region provision model')
+    try:
+        acc_mx = await fetch_acc_mx(region_id, regional_scenario_id)
+    except:
+        raise Exception(f'Problem with accessibility matrix for {region_id}')
+    _, towns_gdf = await fetch_territories(region_id, regional_scenario_id) # TODO добавить агрегацию по юнитам
+    if len(towns_gdf) == 0:
+        raise Exception(f'No towns found for {region_id}')
+    provision_model = ProvisionModel(towns_gdf, acc_mx, verbose = False)
+    # для каждого ненайденного типа сервисов цепляем емкости и считаем обеспеченность
+    for service_type in candidate_service_types:
+        logger.info(f'Evaluating {service_type.id} service_type provision')
+        supplies_df = await fetch_supplies(region_id, service_type)
+        provision = provision_model.calculate(supplies_df, service_type)
+        # и сохраняем их на будущее
+        await _save(provision, region_id, service_type.id, regional_scenario_id)
