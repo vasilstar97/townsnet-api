@@ -57,10 +57,13 @@ async def get_evaluation(region_id : int, level : int | None = None, category : 
     if level is not None:
         #fetch territories
         logger.info('Loading territories to aggregate')
-        units_gdfs, towns_gdf = await provision_service.fetch_territories(region_id)
+        units_gdfs, _ = await provision_service.fetch_territories(region_id)
         units_gdf = units_gdfs[level][['geometry']]
         logger.info('Aggregating')
-        provisions = {st.id : ProvisionModel.agregate(towns_gdf, units_gdf) for st in service_types}
+        for st in service_types:
+            provision =  provisions[st.id]
+            provision.index.name = '' # FIXME doesnt work without that
+            provisions[st.id] = ProvisionModel.agregate(provision, units_gdf)
 
     # merge service types provisions if required
     if len(service_types) > 1:

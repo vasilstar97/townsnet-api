@@ -29,7 +29,7 @@ async def fetch_territories(region_id : int, regional_scenario_id : int | None =
     Fetch region territories for specific regional_scenario with population (optional) and geometry (optional)
     """
     # fetch region
-    regions_gdf = await api_client.get_regions(True)
+    regions_gdf = await api_client.get_regions(geometry)
     region_gdf = regions_gdf[regions_gdf.index == region_id]
     units_gdfs = {2 : region_gdf}
     # fetch towns
@@ -88,7 +88,6 @@ def merge_provisions(provisions : dict[int, gpd.GeoDataFrame], service_types : l
         prov_gdf = provisions[st.id]
         provision[st.name] = prov_gdf['provision']
     provision['provision'] = provision.apply(lambda s : mean([s[st.name] for st in service_types if not np.isnan(s[st.name])]), axis=1)
-    print(provision)
     return provision
 
 def _get_file_path(region_id : int, service_type_id : int, regional_scenario_id : int | None = None):
