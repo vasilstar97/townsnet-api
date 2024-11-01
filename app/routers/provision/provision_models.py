@@ -15,9 +15,6 @@ RU_NAMES_MAPPING = {
 }
 
 class ProvisionModel(FeatureCollectionModel):
-
-    class ProvisionProperties(BaseModel):
-        provision : str
     
     class ProvisionFeature(FeatureModel):
         geometry : PolygonModel | MultiPolygonModel | PointModel
@@ -36,3 +33,24 @@ class ProvisionModel(FeatureCollectionModel):
             return p
     
     features : list[ProvisionFeature]
+
+class GridInputModel(FeatureCollectionModel):
+
+    class GridFeature(BaseModel):
+
+        geometry : PolygonModel | MultiPolygonModel
+        properties : dict | None = None
+
+    features : list[GridFeature]
+
+class GridOutputModel(FeatureCollectionModel):
+
+    class GridFeature(BaseModel):
+
+        class GridProperties(BaseModel):
+            score : float = Field(ge=0, le=5)
+
+        geometry : PolygonModel | MultiPolygonModel
+        properties : GridProperties
+
+    features : list[GridFeature]

@@ -4,10 +4,18 @@ import geopandas as gpd
 import pandas as pd
 from statistics import mean
 from loguru import logger
-from townsnet.provision.service_type import ServiceType, SupplyType
+from townsnet.provision.service_type import ServiceType, SupplyType, Category
 from townsnet.provision.provision_model import ProvisionModel
+from townsnet.provision.social_model import SocialModel
+from shapely import Polygon, MultiPolygon
 from ...utils import api_client
 from ...utils.const import DATA_PATH
+
+CATEGORIES_WEIGHTS = {
+    Category.BASIC: 3,
+    Category.ADDITIONAL : 1,
+    Category.COMFORT : 1
+}
 
 async def fetch_service_types(region_id : int) -> dict[int, ServiceType]:
     """
@@ -99,7 +107,7 @@ def _get_file_path(region_id : int, service_type_id : int, regional_scenario_id 
 async def _exists(region_id : int, service_type_id : int, regional_scenario_id : int | None = None):
     return os.path.exists(_get_file_path(region_id, service_type_id, regional_scenario_id))
 
-async def _load(region_id : int, service_type_id : int, regional_scenario_id : int | None = None):
+async def load(region_id : int, service_type_id : int, regional_scenario_id : int | None = None):
     file_path = _get_file_path(region_id, service_type_id, regional_scenario_id)
     return gpd.read_parquet(file_path)
 
@@ -107,7 +115,7 @@ async def _save(provision_gdf : gpd.GeoDataFrame, region_id : int, service_type_
     file_path = _get_file_path(region_id, service_type_id, regional_scenario_id)
     provision_gdf.to_parquet(file_path)
 
-async def evaluate_and_save(region_id : int, regional_scenario_id : int | None = None):
+async def evaluate_and_save_region(region_id : int, regional_scenario_id : int | None = None):
     logger.info(f'Fetching {region_id} region service types')
     region_service_types = await fetch_service_types(region_id)
     candidate_service_types = []
@@ -135,3 +143,35 @@ async def evaluate_and_save(region_id : int, regional_scenario_id : int | None =
         provision = provision_model.calculate(supplies_df, service_type)
         # и сохраняем их на будущее
         await _save(provision, region_id, service_type.id, regional_scenario_id)
+
+def evaluate_social_indicator(social_model : SocialModel, project_geometry : Polygon | MultiPolygon):
+    
+    # calculating max possible scores
+    service_types = social_model.provisions.keys()
+    max_possible_scores = {}
+    for category in list(Category):
+        category_service_types = filter(lambda st : st.category == category, service_types)
+        max_possible_score = sum(st.weight for st in  category_service_types)
+        max_possible_scores[category] = max_possible_score
+
+    # evaluate context provisions
+    evaluations = social_model.evaluate_provisions(project_geometry)
+    evaluations_df = pd.DataFrame([{
+        'id' : st.id,
+        'weight': st.weight,
+        'category': st.category.name,
+        'provision': prov
+    } for st, prov in evaluations.items()]).set_index('id', drop=True)
+    evaluations_df['score'] = evaluations_df['provision']*evaluations_df['weight']
+    
+    # aggregate by category
+    categories_dfs = {category : evaluations_df[evaluations_df['category'] == category.name] for category in list(Category)}
+    categories_scores = {category : CATEGORIES_WEIGHTS[category]*(category_df['score'].sum())/max_possible_scores[category] for category, category_df in categories_dfs.items()}
+
+    return round(sum(categories_scores.values()))
+
+async def evaluate_project(region_id : int, project_geometry : Polygon | MultiPolygon):
+    ...
+
+async def evaluate_and_save_project(region_id : int, project_scenario_id : int):
+    ...

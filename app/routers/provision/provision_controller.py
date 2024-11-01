@@ -5,6 +5,7 @@ from loguru import logger
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from townsnet.provision.service_type import ServiceType, Category, SupplyType
 from townsnet.provision.provision_model import ProvisionModel
+from townsnet.provision.social_model import SocialModel
 from pydantic_geojson import PolygonModel, MultiPolygonModel
 from ...utils import decorators, api_client
 from ...utils.const import DATA_PATH, EVALUATION_RESPONSE_MESSAGE
@@ -16,7 +17,7 @@ async def on_startup():
     for region_id in regions_df.index:
         if region_id != 1 : continue # TODO убрать когда появятся другие регионы
         try:
-            await provision_service.evaluate_and_save(region_id)
+            await provision_service.evaluate_and_save_region(region_id)
         except Exception as e:
             logger.error(e)
 
@@ -26,8 +27,8 @@ async def on_shutdown():
 router = APIRouter(prefix='/provision', tags=['Provision assessment'])
 
 @router.get('/categories')
-async def get_categories() -> dict[str, str]:
-    return {cat.name:cat.value for cat in Category}
+async def get_categories() -> list[Category]:
+    return Category
 
 @router.get('/{region_id}/levels')
 async def get_levels(region_id : int) -> dict[int, str]:
@@ -41,6 +42,7 @@ async def get_service_types(region_id : int) -> list[ServiceType]:
 @router.get('/{region_id}/get_evaluation')
 @decorators.gdf_to_geojson
 async def get_evaluation(region_id : int, level : int | None = None, category : Category | None = None, service_type_id : int | None = None, regional_scenario_id : int | None = None) -> provision_models.ProvisionModel :
+    
     # fetch service types
     logger.info(f'Fetching service types for {region_id}')
     service_types = list((await provision_service.fetch_service_types(region_id)).values())
@@ -51,12 +53,12 @@ async def get_evaluation(region_id : int, level : int | None = None, category : 
     
     #load provisions
     logger.info(f'Loading indicators for {region_id}')
-    provisions = {st.id : await provision_service._load(region_id, st.id, regional_scenario_id) for st in service_types}
+    provisions = {st.id : await provision_service.load(region_id, st.id, regional_scenario_id) for st in service_types}
 
     #aggregate if needed
     if level is not None:
         #fetch territories
-        logger.info('Loading territories to aggregate')
+        logger.info('Fetching territories to aggregate')
         units_gdfs, _ = await provision_service.fetch_territories(region_id)
         units_gdf = units_gdfs[level][['geometry']]
         logger.info('Aggregating')
@@ -73,15 +75,37 @@ async def get_evaluation(region_id : int, level : int | None = None, category : 
 
     return provision
 
-@router.post('/{region_id}/evaluate_geojson')
-async def evaluate_geojson(region_id : int, regional_scenario_id : int | None = None):
-    return 'not ready yet'
+@router.post('/{region_id}/get_evaluation')
+async def get_geojson_evaluation(region_id : int, geojson : provision_models.GridInputModel, regional_scenario_id : int | None = None) -> list[int]:
+    
+    grid_gdf = gpd.GeoDataFrame.from_features([f.model_dump() for f in geojson.features], crs=4326)
+
+    #fetch service types
+    logger.info(f'Fetching service types for {region_id}')
+    service_types = await provision_service.fetch_service_types(region_id)
+    service_types = {st.id : st for st in service_types.values() if st.weight > 0 and not st.category is None}
+
+    #load towns
+    logger.info('Fetching territories')
+    _, towns_gdf = await provision_service.fetch_territories(region_id)
+
+    #load provisions
+    logger.info(f'Fetching indicators for {region_id}')
+    provisions = {st : await provision_service.load(region_id, st.id, regional_scenario_id) for st in service_types.values()}
+
+    #initialize social model
+    logger.info('Initializing social model')
+    social_model = SocialModel(towns_gdf, provisions)
+
+    logger.info('Evaluating social score for each cell')
+    return grid_gdf.geometry.apply(lambda g : provision_service.evaluate_social_indicator(social_model, g))
 
 @router.post('/{region_id}/evaluate_region')
 async def evaluate_region(background_tasks : BackgroundTasks, region_id : int, regional_scenario_id : int | None = None) -> str:
-    background_tasks.add_task(provision_service.evaluate_and_save, region_id, regional_scenario_id)
+    background_tasks.add_task(provision_service.evaluate_and_save_region, region_id, regional_scenario_id)
     return EVALUATION_RESPONSE_MESSAGE
 
 @router.post('/{region_id}/evaluate_project')
 async def evaluate_project(background_tasks : BackgroundTasks, region_id : int, project_scenario_id : int):
+    background_tasks.add_task(provision_service.evaluate_and_save_project, region_id, project_scenario_id)
     return EVALUATION_RESPONSE_MESSAGE
