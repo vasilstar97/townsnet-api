@@ -1,9 +1,11 @@
+import json
 import os
 import numpy as np
 import geopandas as gpd
 import pandas as pd
 from statistics import mean
 from loguru import logger
+import shapely
 from townsnet.provision.service_type import ServiceType, SupplyType, Category
 from townsnet.provision.provision_model import ProvisionModel
 from townsnet.provision.social_model import SocialModel
@@ -15,6 +17,14 @@ CATEGORIES_WEIGHTS = {
     Category.BASIC: 3,
     Category.ADDITIONAL : 1,
     Category.COMFORT : 1
+}
+
+SOCIAL_INDICATOR_ID = 200
+
+CATEGORIES_INDICATORS_IDS = {
+    Category.BASIC: 201,
+    Category.ADDITIONAL: 202,
+    Category.COMFORT: 203
 }
 
 async def fetch_service_types(region_id : int) -> dict[int, ServiceType]:
@@ -116,6 +126,7 @@ async def _save(provision_gdf : gpd.GeoDataFrame, region_id : int, service_type_
     provision_gdf.to_parquet(file_path)
 
 async def evaluate_and_save_region(region_id : int, regional_scenario_id : int | None = None):
+
     logger.info(f'Fetching {region_id} region service types')
     region_service_types = await fetch_service_types(region_id)
     candidate_service_types = []
@@ -144,7 +155,28 @@ async def evaluate_and_save_region(region_id : int, regional_scenario_id : int |
         # и сохраняем их на будущее
         await _save(provision, region_id, service_type.id, regional_scenario_id)
 
-def evaluate_social_indicator(social_model : SocialModel, project_geometry : Polygon | MultiPolygon):
+async def fetch_social_model(region_id : int, regional_scenario_id : int | None = None) -> SocialModel:
+    #fetch service types
+    logger.info(f'Fetching service types for {region_id}')
+    service_types = await fetch_service_types(region_id)
+    service_types = {st.id : st for st in service_types.values() if st.weight > 0 and not st.category is None}
+
+    #load towns
+    logger.info('Fetching territories')
+    _, towns_gdf = await fetch_territories(region_id)
+
+    #load provisions
+    logger.info(f'Fetching indicators for {region_id}')
+    provisions = {st : await load(region_id, st.id, regional_scenario_id) for st in service_types.values()}
+
+    #initialize social model
+    logger.info('Initializing social model')
+    return SocialModel(towns_gdf, provisions)
+
+def _get_interpretation(evaluations_df):
+    ...
+
+def evaluate_social(social_model : SocialModel, project_geometry : Polygon | MultiPolygon) -> tuple[int, dict[Category, float]] :
     
     # calculating max possible scores
     service_types = social_model.provisions.keys()
@@ -168,10 +200,31 @@ def evaluate_social_indicator(social_model : SocialModel, project_geometry : Pol
     categories_dfs = {category : evaluations_df[evaluations_df['category'] == category.name] for category in list(Category)}
     categories_scores = {category : CATEGORIES_WEIGHTS[category]*(category_df['score'].sum())/max_possible_scores[category] for category, category_df in categories_dfs.items()}
 
-    return round(sum(categories_scores.values()))
+    return round(sum(categories_scores.values()),1), categories_scores
 
-async def evaluate_project(region_id : int, project_geometry : Polygon | MultiPolygon):
-    ...
+async def fetch_regional_scenario_id(project_scenario_id : int):
+    return None # FIXME исправить когда появятся сценарии
 
-async def evaluate_and_save_project(region_id : int, project_scenario_id : int):
-    ...
+async def fetch_project_geometry(project_scenario_id : int, token : str):
+    project_id = (await api_client.get_scenario_by_id(project_scenario_id, token))['project_id']
+    project_info = await api_client.get_project_by_id(project_id, token)
+    geometry_json = json.dumps(project_info['geometry'])
+    return shapely.from_geojson(geometry_json)
+
+async def _save_project_indicators(project_scenario_id : int, social_score : int, categories_scores : int, description : str, token : str):
+    # TODO доделать
+    logger.success(f'project_scenario #{project_scenario_id} -> {SOCIAL_INDICATOR_ID} : {social_score}')
+    for category, score in categories_scores.items():
+        indicator_id = CATEGORIES_INDICATORS_IDS[category]
+        logger.success(f'{category} -> {indicator_id} : {score}')
+
+async def evaluate_and_save_project(region_id : int, project_scenario_id : int, token : str):
+    logger.info('Fetching scenario information')
+    regional_scenario_id = await fetch_regional_scenario_id(project_scenario_id)
+    project_geometry = await fetch_project_geometry(project_scenario_id, token)
+    social_model = await fetch_social_model(region_id, regional_scenario_id)
+    logger.info('Evaluating social score')
+    social_score, categories_scores = evaluate_social(social_model, project_geometry)
+    logger.info('Saving indicators')
+    await _save_project_indicators(project_scenario_id, social_score, categories_scores, 'description', token)
+

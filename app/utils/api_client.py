@@ -91,3 +91,11 @@ async def get_physical_objects_types() -> list[dict]:
 async def get_indicators():
     res = await ra.get(URBAN_API + '/api/v1/indicators_by_parent', {'get_all_subtree':True})
     return res.json()
+
+async def get_scenario_by_id(scenario_id : int, token : str):
+    res = await ra.get(URBAN_API + f'/api/v1/scenarios/{scenario_id}', headers={'Authorization': f'Bearer {token}'})
+    return res.json()
+
+async def get_project_by_id(project_id : int, token : str):
+    res = await ra.get(URBAN_API + f'/api/v1/projects/{project_id}/territory_info', headers={'Authorization': f'Bearer {token}'})
+    return res.json()

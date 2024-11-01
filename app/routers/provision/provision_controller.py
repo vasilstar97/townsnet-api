@@ -80,25 +80,10 @@ async def get_geojson_evaluation(region_id : int, geojson : provision_models.Gri
     
     grid_gdf = gpd.GeoDataFrame.from_features([f.model_dump() for f in geojson.features], crs=4326)
 
-    #fetch service types
-    logger.info(f'Fetching service types for {region_id}')
-    service_types = await provision_service.fetch_service_types(region_id)
-    service_types = {st.id : st for st in service_types.values() if st.weight > 0 and not st.category is None}
-
-    #load towns
-    logger.info('Fetching territories')
-    _, towns_gdf = await provision_service.fetch_territories(region_id)
-
-    #load provisions
-    logger.info(f'Fetching indicators for {region_id}')
-    provisions = {st : await provision_service.load(region_id, st.id, regional_scenario_id) for st in service_types.values()}
-
-    #initialize social model
-    logger.info('Initializing social model')
-    social_model = SocialModel(towns_gdf, provisions)
+    social_model = provision_service.fetch_social_model(region_id, regional_scenario_id)
 
     logger.info('Evaluating social score for each cell')
-    return grid_gdf.geometry.apply(lambda g : provision_service.evaluate_social_indicator(social_model, g))
+    return grid_gdf.geometry.apply(lambda g : provision_service.evaluate_social(social_model, g)[0])
 
 @router.post('/{region_id}/evaluate_region')
 async def evaluate_region(background_tasks : BackgroundTasks, region_id : int, regional_scenario_id : int | None = None) -> str:
@@ -106,6 +91,6 @@ async def evaluate_region(background_tasks : BackgroundTasks, region_id : int, r
     return EVALUATION_RESPONSE_MESSAGE
 
 @router.post('/{region_id}/evaluate_project')
-async def evaluate_project(background_tasks : BackgroundTasks, region_id : int, project_scenario_id : int):
-    background_tasks.add_task(provision_service.evaluate_and_save_project, region_id, project_scenario_id)
+async def evaluate_project(background_tasks : BackgroundTasks, region_id : int, project_scenario_id : int, token : str):
+    background_tasks.add_task(provision_service.evaluate_and_save_project, region_id, project_scenario_id, token)
     return EVALUATION_RESPONSE_MESSAGE
