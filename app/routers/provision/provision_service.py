@@ -173,8 +173,16 @@ async def fetch_social_model(region_id : int, regional_scenario_id : int | None 
     logger.info('Initializing social model')
     return SocialModel(towns_gdf, provisions)
 
-def _get_interpretation(evaluations_df):
-    ...
+def _get_interpretation(evaluations_df : pd.DataFrame) -> str:
+    evaluations_df = evaluations_df.sort_values('score', ascending=False)
+    
+    def _df_to_text(df):
+        texts = [f'{row["name"]} - {round(row["score"],1)}' for _, row in df.iterrows()]
+        return str.join(', ', texts)
+    
+    best = evaluations_df.head(3)
+    worst = evaluations_df.tail(3)
+    return f'Лучшая оценка: {_df_to_text(best)}. Худшая оценка: {_df_to_text(worst)}'
 
 def evaluate_social(social_model : SocialModel, project_geometry : Polygon | MultiPolygon) -> tuple[int, dict[Category, float]] :
     
@@ -190,15 +198,19 @@ def evaluate_social(social_model : SocialModel, project_geometry : Polygon | Mul
     evaluations = social_model.evaluate_provisions(project_geometry)
     evaluations_df = pd.DataFrame([{
         'id' : st.id,
+        'name': st.name, 
         'weight': st.weight,
         'category': st.category.name,
         'provision': prov
     } for st, prov in evaluations.items()]).set_index('id', drop=True)
     evaluations_df['score'] = evaluations_df['provision']*evaluations_df['weight']
+
+    interpretation = _get_interpretation(evaluations_df)
+    logger.info(interpretation)
     
     # aggregate by category
     categories_dfs = {category : evaluations_df[evaluations_df['category'] == category.name] for category in list(Category)}
-    categories_scores = {category : CATEGORIES_WEIGHTS[category]*(category_df['score'].sum())/max_possible_scores[category] for category, category_df in categories_dfs.items()}
+    categories_scores = {category : round(CATEGORIES_WEIGHTS[category]*(category_df['score'].sum())/max_possible_scores[category], 2) for category, category_df in categories_dfs.items()}
 
     return round(sum(categories_scores.values()),1), categories_scores
 
