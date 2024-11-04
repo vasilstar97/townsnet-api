@@ -225,10 +225,23 @@ async def fetch_project_geometry(project_scenario_id : int, token : str):
 
 async def _save_project_indicators(project_scenario_id : int, social_score : int, categories_scores : int, description : str, token : str):
     # TODO доделать
-    logger.success(f'project_scenario #{project_scenario_id} -> {SOCIAL_INDICATOR_ID} : {social_score}')
-    for category, score in categories_scores.items():
-        indicator_id = CATEGORIES_INDICATORS_IDS[category]
-        logger.success(f'{category} -> {indicator_id} : {score}')
+    indicators_mapping = {
+        SOCIAL_INDICATOR_ID : social_score,
+        **{CATEGORIES_INDICATORS_IDS[category] : score for category, score in categories_scores.items()}
+    }
+    for indicator_id, value in indicators_mapping.items():
+        res = await api_client.post_scenario_indicator(indicator_id, project_scenario_id, value, token)
+        status = res.status_code
+        logger.info(status)
+        if status == 200:
+            logger.success(f'{indicator_id} -> {value}')
+        else:
+            logger.error(f'{indicator_id} -> {value}')
+            logger.info(res.text)
+    # logger.success(f'project_scenario #{project_scenario_id} -> {SOCIAL_INDICATOR_ID} : {social_score}')
+    # for category, score in categories_scores.items():
+    #     indicator_id = CATEGORIES_INDICATORS_IDS[category]
+    #     logger.success(f'{category} -> {indicator_id} : {score}')
 
 async def evaluate_and_save_project(region_id : int, project_scenario_id : int, token : str):
     logger.info('Fetching scenario information')

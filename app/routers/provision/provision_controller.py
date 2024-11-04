@@ -2,7 +2,7 @@ import geopandas as gpd
 import pandas as pd
 import os
 from loguru import logger
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Request
 from townsnet.provision.service_type import ServiceType, Category, SupplyType
 from townsnet.provision.provision_model import ProvisionModel
 from townsnet.provision.social_model import SocialModel
@@ -85,12 +85,36 @@ async def get_geojson_evaluation(region_id : int, geojson : provision_models.Gri
     logger.info('Evaluating social score for each cell')
     return grid_gdf.geometry.apply(lambda g : provision_service.evaluate_social(social_model, g)[0])
 
+def _get_token_from_request(request : Request) -> str:
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        raise HTTPException(
+            status_code=401,
+            detail="Authorization header missing",
+        )
+    # Проверяем формат: заголовок должен начинаться с 'Bearer '
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid authorization header format. Expected 'Bearer <token>'"
+        )
+    
+    token = auth_header[len("Bearer "):]
+
+    if not token:
+        raise HTTPException(
+            status_code=400,
+            detail="Token is missing in the authorization header"
+        )
+    
+    return token
+
 @router.post('/{region_id}/evaluate_region')
-async def evaluate_region(background_tasks : BackgroundTasks, region_id : int, regional_scenario_id : int | None = None) -> str:
-    background_tasks.add_task(provision_service.evaluate_and_save_region, region_id, regional_scenario_id)
+async def evaluate_region(request : Request, background_tasks : BackgroundTasks, region_id : int, regional_scenario_id : int | None = None) -> str:
+    background_tasks.add_task(provision_service.evaluate_and_save_region, region_id, regional_scenario_id, _get_token_from_request(request))
     return EVALUATION_RESPONSE_MESSAGE
 
 @router.post('/{region_id}/evaluate_project')
-async def evaluate_project(background_tasks : BackgroundTasks, region_id : int, project_scenario_id : int, token : str):
-    background_tasks.add_task(provision_service.evaluate_and_save_project, region_id, project_scenario_id, token)
+async def evaluate_project(request : Request, background_tasks : BackgroundTasks, region_id : int, project_scenario_id : int):
+    background_tasks.add_task(provision_service.evaluate_and_save_project, region_id, project_scenario_id, _get_token_from_request(request))
     return EVALUATION_RESPONSE_MESSAGE
