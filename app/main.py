@@ -6,30 +6,31 @@ from fastapi.middleware.gzip import GZipMiddleware
 # from .utils import REGIONS_DICT, get_provision, get_region, process_output, process_territory
 from .utils import api_client
 from .routers.engineering import engineering_controller
+from .routers.engineering import engineer_potential_router
 from .routers.provision import provision_controller
 from loguru import logger
 from contextlib import asynccontextmanager
 
 controllers = [engineering_controller, provision_controller]
 
-async def on_startup():
-    for controller in controllers:
-        await controller.on_startup()
+# async def on_startup():
+#     for controller in controllers:
+#         await controller.on_startup()
 
-async def on_shutdown():
-    for controller in controllers:
-        await controller.on_shutdown()
+# async def on_shutdown():
+#     for controller in controllers:
+#         await controller.on_shutdown()
 
-@asynccontextmanager
-async def lifespan(router : FastAPI):
-    await on_startup()
-    yield
-    await on_shutdown()
+# @asynccontextmanager
+# async def lifespan(router : FastAPI):
+#     await on_startup()
+#     yield
+#     await on_shutdown()
 
 app = FastAPI(
     title='TownsNet API',
     description='API providing methods for regions provisions assessment and other stuff.',
-    lifespan=lifespan
+    # lifespan=lifespan
 )
 
 app.add_middleware(
@@ -52,3 +53,4 @@ async def regions() -> dict[int, str]:
 
 app.include_router(provision_controller.router)
 app.include_router(engineering_controller.router)
+app.include_router(engineer_potential_router.engineer_potential_router)
