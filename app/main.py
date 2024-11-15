@@ -7,10 +7,10 @@ from fastapi.middleware.gzip import GZipMiddleware
 from .utils import api_client
 from .routers.engineering import engineering_controller
 from .routers.provision import provision_controller
-from loguru import logger
+from .routers.hex import hex_controller
 from contextlib import asynccontextmanager
 
-controllers = [engineering_controller, provision_controller]
+controllers = [engineering_controller, provision_controller, hex_controller]
 
 async def on_startup():
     for controller in controllers:
@@ -50,5 +50,5 @@ async def regions() -> dict[int, str]:
     regions_df = await api_client.get_regions()
     return {i : regions_df.loc[i,'name'] for i in regions_df.index}
 
-app.include_router(provision_controller.router)
-app.include_router(engineering_controller.router)
+for controller in controllers:
+    app.include_router(controller.router)

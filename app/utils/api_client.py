@@ -5,10 +5,8 @@ import requests_async as ra
 import pandas as pd
 import geopandas as gpd
 from datetime import date
+from .const import URBAN_API, TRANSPORT_FRAMES_API, DEFAULT_CRS
 
-DEFAULT_CRS = 4326
-URBAN_API = os.environ['URBAN_API'] if 'URBAN_API' in os.environ else 'http://10.32.1.107:5300/' 
-TRANSPORT_FRAMES_API = os.environ['TRANSPORT_FRAMES_API'] if 'TRANSPORT_FRAMES_API' in os.environ else "http://10.32.1.65:5700" 
 PAGE_SIZE = 10_000
 POPULATION_COUNT_INDICATOR_ID = 1
 GRAPH_TYPE = 'inter'
@@ -59,12 +57,17 @@ async def get_territories(parent_id : int | None = None, all_levels = False, geo
     df = pd.DataFrame(res_json)
     return df.set_index('territory_id', drop=True)
 
-async def get_territories_population(territories_gdf : gpd.GeoDataFrame, regional_scenario_id : int | None = None):
+async def get_territories_population(territories_gdf : gpd.GeoDataFrame):
     res = await ra.get(f'{URBAN_API}/api/v1/indicator/{POPULATION_COUNT_INDICATOR_ID}/values', verify=False)
     res_df = pd.DataFrame(res.json())
-    res_df = res_df[res_df['territory_id'].isin(territories_gdf.index)]
-    res_df = res_df.groupby('territory_id').agg({'value': 'last'}).rename(columns={'value':'population'})
-    return territories_gdf[['geometry']].merge(res_df, how='left', left_index=True, right_index=True)
+    res_df = res_df[res_df['territory'].apply(lambda x: x['id'] if isinstance(x, dict) else None).isin(territories_gdf.index)]
+    res_df = (
+        res_df
+        .groupby(res_df['territory'].apply(lambda x: x['id'] if isinstance(x, dict) else None))
+        .agg({'value': 'last'})
+        .rename(columns={'value': 'population'})
+    )
+    return territories_gdf[['geometry', 'name']].merge(res_df, left_index=True, right_index=True)
 
 async def get_service_type_capacities(territory_id : int, level : int, service_type_id : int) -> list[dict[str, int]]:
     res = await ra.get(URBAN_API + f'/api/v1/territory/{territory_id}/services_capacity', {
@@ -100,7 +103,7 @@ async def get_scenario_by_id(scenario_id : int, token : str):
     return res.json()
 
 async def get_project_by_id(project_id : int, token : str):
-    res = await ra.get(URBAN_API + f'/api/v1/projects/{project_id}/territory_info', headers={'Authorization': f'Bearer {token}'}, verify=False)
+    res = await ra.get(URBAN_API + f'/api/v1/projects/{project_id}/territory', headers={'Authorization': f'Bearer {token}'}, verify=False)
     return res.json()
 
 async def post_scenario_indicator(indicator_id : int, scenario_id : int, value : float, token : str):

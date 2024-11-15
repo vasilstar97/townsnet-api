@@ -52,14 +52,14 @@ async def fetch_territories(region_id : int, regional_scenario_id : int | None =
     units_gdfs = {2 : region_gdf}
     # fetch towns
     territories_gdf = await api_client.get_territories(region_id, all_levels = True, geometry=geometry)
-    territories_gdf['was_point'] = territories_gdf['properties'].apply(lambda p : p['was_point'] if 'was_point' in p else False)
+    # territories_gdf['was_point'] = territories_gdf['properties'].apply(lambda p : p['was_point'] if 'was_point' in p else False)
     #filter towns gdf
-    towns_gdf = territories_gdf[territories_gdf['was_point']]
+    towns_gdf = territories_gdf[territories_gdf['is_city']]
     if population:
         towns_gdf = await api_client.get_territories_population(towns_gdf)
         towns_gdf['population'] = towns_gdf['population'].fillna(0)
     #filter units gdf
-    units_gdf = territories_gdf[~territories_gdf['was_point']]
+    units_gdf = territories_gdf[~territories_gdf['is_city']]
     levels = units_gdf['level'].unique()
     # fetch population
     for level in levels:
@@ -218,7 +218,7 @@ async def fetch_regional_scenario_id(project_scenario_id : int):
     return None # FIXME исправить когда появятся сценарии
 
 async def fetch_project_geometry(project_scenario_id : int, token : str):
-    project_id = (await api_client.get_scenario_by_id(project_scenario_id, token))['project_id']
+    project_id = (await api_client.get_scenario_by_id(project_scenario_id, token))['project']['project_id']
     project_info = await api_client.get_project_by_id(project_id, token)
     geometry_json = json.dumps(project_info['geometry'])
     return shapely.from_geojson(geometry_json)
