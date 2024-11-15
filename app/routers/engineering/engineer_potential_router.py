@@ -76,8 +76,8 @@ def get_engineering_gdf(data_dict: dict) -> gpd.GeoDataFrame:
     return combined_gdf
 
 
-@engineer_potential_router.post("/test_engineer_potential", response_model=Dict[str, Any])
-async def test_population_criterion_endpoint(region_id : int):
+@engineer_potential_router.post("/test_engineer_potential", response_model=list[float])
+async def test_population_criterion_endpoint(region_id : int, geojson_data: dict,):
     try:
         gdfs = {}
         for eng_obj, ind_id in ENG_OBJ.items():
@@ -85,9 +85,20 @@ async def test_population_criterion_endpoint(region_id : int):
                 gdf = fetch_required_objects(region_id, ind_id)
                 gdfs[eng_obj] = gdf
         combined_gdf = get_engineering_gdf(gdfs)
-        spb_hex = gpd.read_file('/Users/mvin/Code/townsnet-api/spb_hex.geojson')
-        analyzer = InfrastructureAnalyzer(combined_gdf, spb_hex)
+
+        if geojson_data.get("type") != "FeatureCollection":
+            raise HTTPException(status_code=400, detail="Неверный формат GeoJSON, ожидался FeatureCollection")
+        
+        polygon_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"], crs=4326)
+        polygon_gdf = polygon_gdf.to_crs(combined_gdf.crs)
+        analyzer = InfrastructureAnalyzer(combined_gdf, polygon_gdf)
+
         results = analyzer.get_results()
-        return json.loads(results.to_json())
+        if results.empty:
+            raise HTTPException(status_code=404, detail="Результаты не найдены")
+            
+        scores = [float(res['score']) for res in results.to_dict('records')]
+        return scores
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
