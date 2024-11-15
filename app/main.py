@@ -21,7 +21,7 @@ async def on_shutdown():
         await controller.on_shutdown()
 
 @asynccontextmanager
-async def lifespan(router : FastAPI):
+async def lifespan(app : FastAPI):
     await on_startup()
     yield
     await on_shutdown()

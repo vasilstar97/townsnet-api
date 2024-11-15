@@ -232,7 +232,6 @@ async def _save_project_indicators(project_scenario_id : int, social_score : int
     for indicator_id, value in indicators_mapping.items():
         res = await api_client.post_scenario_indicator(indicator_id, project_scenario_id, value, token)
         status = res.status_code
-        logger.info(status)
         if status == 200:
             logger.success(f'{indicator_id} -> {value}')
         else:

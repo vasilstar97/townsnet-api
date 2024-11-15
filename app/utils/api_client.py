@@ -110,9 +110,12 @@ async def post_scenario_indicator(indicator_id : int, scenario_id : int, value :
     res = await ra.post(URBAN_API + f'/api/v1/scenarios/{scenario_id}/indicators_values', headers={'Authorization': f'Bearer {token}'}, json={
         'indicator_id': indicator_id,
         'scenario_id': scenario_id,
+        'territory_id': None,
+        'hexagon_id': None,
         'date_type': 'year',
         'date_value': date.today().isoformat(),
         'value': value,
+        'comment': '--',
         'value_type': INDICATOR_VALUE_TYPE,
         'information_source': INDICATOR_INFORMATION_SOURCE
     }, verify=False)
