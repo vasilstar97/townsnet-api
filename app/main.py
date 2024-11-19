@@ -7,10 +7,11 @@ from fastapi.middleware.gzip import GZipMiddleware
 from .utils import api_client
 from .routers.engineering import engineering_controller
 from .routers.provision import provision_controller
+from .routers.prioc import prioc_controller
 from loguru import logger
 from contextlib import asynccontextmanager
 
-controllers = [engineering_controller, provision_controller]
+controllers = [engineering_controller, provision_controller, prioc_controller]
 
 async def on_startup():
     for controller in controllers:
