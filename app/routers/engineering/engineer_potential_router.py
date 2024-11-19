@@ -77,7 +77,9 @@ def retrieve_project_and_territory(project_scenario_id: int, token: str):
     scenario_response = requests.get(f"{URBAN_API}/api/v1/scenarios/{project_scenario_id}", headers=headers)
     scenario_response.raise_for_status()
     scenario_data = scenario_response.json()
-    project_id = scenario_data.get("project_id")
+    project_id = scenario_data.get("project", {}).get("project_id")
+    if project_id is None:
+        raise Exception("Project ID is missing in scenario data.")
     
     territory_response = requests.get(f"{URBAN_API}/api/v1/projects/{project_id}/territory", headers=headers)
     territory_response.raise_for_status()
