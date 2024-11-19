@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query, Header,  Request
 import json
 from townsnet.engineering.engineer_potential import InfrastructureAnalyzer
 import requests
@@ -7,6 +7,8 @@ import shapely
 import json
 import pandas as pd
 from typing import Any, Dict
+from loguru import logger
+from datetime import datetime
 
 engineer_potential_router = APIRouter(prefix="/engineer_potential", tags=["engineer"])
 
@@ -76,8 +78,8 @@ def get_engineering_gdf(data_dict: dict) -> gpd.GeoDataFrame:
     return combined_gdf
 
 
-@engineer_potential_router.post("/test_engineer_potential", response_model=list[float])
-async def test_population_criterion_endpoint(region_id : int, geojson_data: dict,):
+@engineer_potential_router.post("/engineer_potential_hex", response_model=list[float])
+async def engineer_potential_hex_endpoint(region_id : int, geojson_data: dict,):
     try:
         gdfs = {}
         for eng_obj, ind_id in ENG_OBJ.items():
@@ -102,3 +104,95 @@ async def test_population_criterion_endpoint(region_id : int, geojson_data: dict
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+async def process_engineer(
+    region_id: int,
+    project_scenario_id: int,
+    token: str
+):
+    try:
+        # Getting project_id and additional information based on scenario_id
+        scenario_response = requests.get(
+            f"{URBAN_API}/api/v1/scenarios/{project_scenario_id}",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        if scenario_response.status_code != 200:
+            raise Exception("Error retrieving scenario information")
+        
+        scenario_data = scenario_response.json()
+        project_id = int(scenario_data.get("project_id"))  # Convert to standard int
+        
+        # Retrieving territory geometry
+        territory_response = requests.get(
+            f"{URBAN_API}/api/v1/projects/{project_id}/territory",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        if territory_response.status_code != 200:
+            raise Exception("Error retrieving territory geometry")
+        
+        # Extracting only the polygon geometry
+        territory_data = territory_response.json()
+        territory_geometry = territory_data["geometry"]
+
+        # Converting the territory geometry to GeoDataFrame
+        territory_feature = {
+            'type': 'Feature',
+            'geometry': territory_geometry,
+            'properties': {}
+        }
+ 
+        gdfs = {}
+        for eng_obj, ind_id in ENG_OBJ.items():
+            if len(ind_id) > 0:
+                gdf = fetch_required_objects(region_id, ind_id)
+                gdfs[eng_obj] = gdf
+        combined_gdf = get_engineering_gdf(gdfs)
+        
+        polygon_gdf = gpd.GeoDataFrame.from_features([territory_feature], crs=4326)
+        polygon_gdf = polygon_gdf.to_crs(combined_gdf.crs)
+        analyzer = InfrastructureAnalyzer(combined_gdf, polygon_gdf)
+
+        results = analyzer.get_results()
+
+        # Saving the evaluation to the database
+        for res in results:
+            indicator_data = {
+                "scenario_id": project_scenario_id,  # Add scenario_id
+                "indicator_id": 204,
+                "date_type": "year",
+                "date_value": datetime.now().strftime("%Y-%m-%d"),
+                "value": float(res['score']),
+                "value_type": "real",
+                "information_source": "modeled"
+            }
+
+            indicators_response = requests.post(
+                f"{URBAN_API}/api/v1/scenarios/{project_scenario_id}/indicators_values",
+                headers={"Authorization": f"Bearer {token}"},
+                json=indicator_data
+            )
+            if indicators_response.status_code not in (200, 201):  # Successful codes: 200 and 201
+                logger.error(f"Error saving indicators: {indicators_response.status_code}, "
+                             f"Response body: {indicators_response.text}")
+                raise Exception("Error saving indicators")
+    except Exception as e:
+        logger.error(f"Error in the evaluation process: {e}")
+
+@engineer_potential_router.post("/save_engineer_potential")
+async def save_engineer_potential_endpoint(
+    region_id: int,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    project_scenario_id: int | None = Query(None, description="Project scenario ID, if available"),
+):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authorization token is missing or invalid")
+    
+    token = auth_header.split(" ")[1]
+    # Add a background task that will be executed after the response is returned
+    background_tasks.add_task(process_engineer, region_id, project_scenario_id, token)
+    
+    # Instantly return a message indicating that processing has started
+    return {"message": "Population criterion processing started", "status": "processing"}
