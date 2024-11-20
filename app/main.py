@@ -6,12 +6,11 @@ from fastapi.middleware.gzip import GZipMiddleware
 # from .utils import REGIONS_DICT, get_provision, get_region, process_output, process_territory
 from .utils import api_client
 from .routers.engineering import engineering_controller
-from .routers.engineering import engineer_potential_router
 from .routers.provision import provision_controller
-from loguru import logger
+from .routers.hex import hex_controller
 from contextlib import asynccontextmanager
 
-controllers = [engineering_controller, provision_controller]
+controllers = [engineering_controller, provision_controller, hex_controller]
 
 async def on_startup():
     for controller in controllers:
@@ -22,7 +21,7 @@ async def on_shutdown():
         await controller.on_shutdown()
 
 @asynccontextmanager
-async def lifespan(router : FastAPI):
+async def lifespan(app : FastAPI):
     await on_startup()
     yield
     await on_shutdown()
@@ -51,6 +50,5 @@ async def regions() -> dict[int, str]:
     regions_df = await api_client.get_regions()
     return {i : regions_df.loc[i,'name'] for i in regions_df.index}
 
-app.include_router(provision_controller.router)
-app.include_router(engineering_controller.router)
-app.include_router(engineer_potential_router.engineer_potential_router)
+for controller in controllers:
+    app.include_router(controller.router)

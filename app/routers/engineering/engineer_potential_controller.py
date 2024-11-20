@@ -12,7 +12,7 @@ from townsnet.engineering.engineer_potential import InfrastructureAnalyzer
 from app.utils.auth import verify_token 
 
 # Constants and Configuration
-engineer_potential_router = APIRouter(prefix="/engineer_potential", tags=["engineer"])
+router = APIRouter(prefix="/engineer_potential", tags=["engineer"])
 URBAN_API = 'http://10.32.1.107:5300'
 PAGE_SIZE = 10_000
 
@@ -128,7 +128,7 @@ async def process_engineer(region_id: int, project_scenario_id: int, token: str)
         logger.error(f"Error during engineer processing: {e}")
 
 # API Endpoints
-@engineer_potential_router.post("/engineer_potential_hex", response_model=list[float])
+@router.post("/engineer_potential_hex", response_model=list[float])
 async def engineer_potential_hex_endpoint(region_id: int, geojson_data: dict, token: str = Depends(verify_token)):
     try:
         gdfs = {eng_obj: fetch_required_objects(region_id, pot_ids) for eng_obj, pot_ids in ENG_OBJ.items()}
@@ -148,7 +148,7 @@ async def engineer_potential_hex_endpoint(region_id: int, geojson_data: dict, to
         logger.error(f"Error in engineer potential calculation: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
-@engineer_potential_router.post("/save_engineer_potential")
+@router.post("/save_engineer_potential")
 async def save_engineer_potential_endpoint(region_id: int, background_tasks: BackgroundTasks, token: str = Depends(verify_token), project_scenario_id: int = Query(...)):
     
     background_tasks.add_task(process_engineer, region_id, project_scenario_id, token)
