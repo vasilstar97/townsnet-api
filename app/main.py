@@ -13,24 +13,24 @@ from contextlib import asynccontextmanager
 
 controllers = [engineering_controller, provision_controller]
 
-# async def on_startup():
-#     for controller in controllers:
-#         await controller.on_startup()
+async def on_startup():
+    for controller in controllers:
+        await controller.on_startup()
 
-# async def on_shutdown():
-#     for controller in controllers:
-#         await controller.on_shutdown()
+async def on_shutdown():
+    for controller in controllers:
+        await controller.on_shutdown()
 
-# @asynccontextmanager
-# async def lifespan(router : FastAPI):
-#     await on_startup()
-#     yield
-#     await on_shutdown()
+@asynccontextmanager
+async def lifespan(router : FastAPI):
+    await on_startup()
+    yield
+    await on_shutdown()
 
 app = FastAPI(
     title='TownsNet API',
     description='API providing methods for regions provisions assessment and other stuff.',
-    # lifespan=lifespan
+    lifespan=lifespan
 )
 
 app.add_middleware(
