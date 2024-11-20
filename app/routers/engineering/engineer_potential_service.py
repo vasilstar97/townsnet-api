@@ -1,20 +1,13 @@
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query, Header, Request
 import requests
 import geopandas as gpd
 import shapely
 import pandas as pd
 from typing import Any, Dict
 from loguru import logger
-from datetime import datetime
 import json
 from enum import Enum
 from townsnet.engineering.engineer_potential import InfrastructureAnalyzer
-from app.utils.auth import verify_token 
-
-# Constants and Configuration
-router = APIRouter(prefix="/engineer_potential", tags=["engineer"])
-URBAN_API = 'http://10.32.1.107:5300'
-PAGE_SIZE = 10_000
+from ...utils.const import URBAN_API
 
 # Enums for engineering object types
 class EngineeringObject(Enum):
@@ -23,6 +16,8 @@ class EngineeringObject(Enum):
     GAS_SUPPLY = 'Газоснабжение'
     WATER_SUPPLY = 'Водоснабжение'
     WATER_DRAINAGE = 'Водоотведение'
+
+PAGE_SIZE = 10_000
 
 ENG_OBJ = {
     EngineeringObject.POWER_SUPPLY: [14, 20, 21, 33, 34, 35],
@@ -126,31 +121,3 @@ async def process_engineer(region_id: int, project_scenario_id: int, token: str)
         analyze_and_save_results(analyzer, project_scenario_id, token)
     except Exception as e:
         logger.error(f"Error during engineer processing: {e}")
-
-# API Endpoints
-@router.post("/engineer_potential_hex", response_model=list[float])
-async def engineer_potential_hex_endpoint(region_id: int, geojson_data: dict, token: str = Depends(verify_token)):
-    try:
-        gdfs = {eng_obj: fetch_required_objects(region_id, pot_ids) for eng_obj, pot_ids in ENG_OBJ.items()}
-        combined_gdf = combine_engineering_gdfs(gdfs)
-
-        if geojson_data.get("type") != "FeatureCollection":
-            raise HTTPException(status_code=400, detail="Invalid GeoJSON format. Expected FeatureCollection.")
-
-        polygon_gdf = gpd.GeoDataFrame.from_features(geojson_data["features"], crs=4326).to_crs(combined_gdf.crs)
-        analyzer = InfrastructureAnalyzer(combined_gdf, polygon_gdf)
-        results = analyzer.get_results()
-        if results.empty:
-            raise HTTPException(status_code=404, detail="No results found.")
-        
-        return [float(res['score']) for res in results.to_dict('records')]
-    except Exception as e:
-        logger.error(f"Error in engineer potential calculation: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-@router.post("/save_engineer_potential")
-async def save_engineer_potential_endpoint(region_id: int, background_tasks: BackgroundTasks, token: str = Depends(verify_token), project_scenario_id: int = Query(...)):
-    
-    background_tasks.add_task(process_engineer, region_id, project_scenario_id, token)
-    return {"message": "Processing started.", "status": "processing"}
-

@@ -6,12 +6,11 @@ from fastapi.middleware.gzip import GZipMiddleware
 # from .utils import REGIONS_DICT, get_provision, get_region, process_output, process_territory
 from .utils import api_client
 from .routers.engineering import engineering_controller
-from .routers.engineering import engineer_potential_controller
 from .routers.provision import provision_controller
 from .routers.hex import hex_controller
 from contextlib import asynccontextmanager
 
-controllers = [engineering_controller, provision_controller, hex_controller, engineer_potential_controller]
+controllers = [engineering_controller, provision_controller, hex_controller]
 
 async def on_startup():
     for controller in controllers:
