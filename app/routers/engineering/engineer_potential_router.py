@@ -9,6 +9,7 @@ from datetime import datetime
 import json
 from enum import Enum
 from townsnet.engineering.engineer_potential import InfrastructureAnalyzer
+from app.utils.auth import verify_token 
 
 # Constants and Configuration
 engineer_potential_router = APIRouter(prefix="/engineer_potential", tags=["engineer"])
@@ -91,16 +92,17 @@ def analyze_and_save_results(analyzer: InfrastructureAnalyzer, project_scenario_
     results = analyzer.get_results()
     for res in results.to_dict("records"):
         indicator_data = {
-            "scenario_id": project_scenario_id,
             "indicator_id": 204,
-            "date_type": "year",
-            "date_value": datetime.now().strftime("%Y-%m-%d"),
+            "scenario_id": project_scenario_id,
+            "territory_id": None,
+            "hexagon_id": None,
             "value": float(res['score']),
-            "value_type": "real",
+            "comment": '_',
             "information_source": "modeled"
         }
+
         response = requests.post(
-            f"{URBAN_API}/api/v1/scenarios/{project_scenario_id}/indicators_values",
+            f"{URBAN_API}/api/v1/scenarios/indicators_values",
             headers={"Authorization": f"Bearer {token}"},
             json=indicator_data
         )
@@ -113,7 +115,13 @@ async def process_engineer(region_id: int, project_scenario_id: int, token: str)
         territory_geometry = retrieve_project_and_territory(project_scenario_id, token)
         gdfs = {eng_obj: fetch_required_objects(region_id, pot_ids) for eng_obj, pot_ids in ENG_OBJ.items()}
         combined_gdf = combine_engineering_gdfs(gdfs)
-        polygon_gdf = gpd.GeoDataFrame.from_features([{"type": "Feature", "geometry": territory_geometry}], crs=4326).to_crs(combined_gdf.crs)
+        territory_feature = {
+            'type': 'Feature',
+            'geometry': territory_geometry,
+            'properties': {}
+        }
+        polygon_gdf = gpd.GeoDataFrame.from_features([territory_feature], crs=4326)
+        polygon_gdf = polygon_gdf.to_crs(combined_gdf.crs)
         analyzer = InfrastructureAnalyzer(combined_gdf, polygon_gdf)
         analyze_and_save_results(analyzer, project_scenario_id, token)
     except Exception as e:
@@ -121,7 +129,7 @@ async def process_engineer(region_id: int, project_scenario_id: int, token: str)
 
 # API Endpoints
 @engineer_potential_router.post("/engineer_potential_hex", response_model=list[float])
-async def engineer_potential_hex_endpoint(region_id: int, geojson_data: dict):
+async def engineer_potential_hex_endpoint(region_id: int, geojson_data: dict, token: str = Depends(verify_token)):
     try:
         gdfs = {eng_obj: fetch_required_objects(region_id, pot_ids) for eng_obj, pot_ids in ENG_OBJ.items()}
         combined_gdf = combine_engineering_gdfs(gdfs)
@@ -141,11 +149,7 @@ async def engineer_potential_hex_endpoint(region_id: int, geojson_data: dict):
         raise HTTPException(status_code=400, detail=str(e))
 
 @engineer_potential_router.post("/save_engineer_potential")
-async def save_engineer_potential_endpoint(region_id: int, background_tasks: BackgroundTasks, request: Request, project_scenario_id: int = Query(...)):
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authorization token is missing or invalid")
-    token = auth_header.split(" ")[1]
+async def save_engineer_potential_endpoint(region_id: int, background_tasks: BackgroundTasks, token: str = Depends(verify_token), project_scenario_id: int = Query(...)):
     
     background_tasks.add_task(process_engineer, region_id, project_scenario_id, token)
     return {"message": "Processing started.", "status": "processing"}
