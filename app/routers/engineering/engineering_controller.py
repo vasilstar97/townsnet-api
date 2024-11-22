@@ -1,12 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
-from townsnet.engineering.engineering_model import EngineeringModel, EngineeringObject
 from townsnet.engineering.engineer_potential import InfrastructureAnalyzer
 from pydantic_geojson import FeatureCollectionModel, PolygonModel, MultiPolygonModel
 from ...utils import decorators
 from . import engineering_service, engineering_models, engineer_potential_service
-from ...utils.const import EVALUATION_RESPONSE_MESSAGE, URBAN_API
-from datetime import datetime
-import requests
+from ...utils.const import EVALUATION_RESPONSE_MESSAGE
 from app.utils.auth import verify_token 
 import geopandas as gpd
 from loguru import logger
@@ -40,15 +37,14 @@ async def get_evaluation(region_id : int, level : int) -> engineering_models.Eng
 async def evaluate_region_endpoint(
     region_id: int,
     regional_scenario_id: int | None = None,
-    background_tasks: BackgroundTasks = BackgroundTasks(),
-    token: str = Depends(verify_token)
+    background_tasks: BackgroundTasks = BackgroundTasks()
 ):
     background_tasks.add_task(engineering_service.process_region_evaluation, region_id, regional_scenario_id, token)
-    return {"message": "Region evaluation started", "status": "processing"}
+    return EVALUATION_RESPONSE_MESSAGE
 
 
 @router.post('/{region_id}/evaluate_geojson')
-async def engineer_potential_hex_endpoint(region_id: int, geojson_data: dict, token: str = Depends(verify_token)):
+async def engineer_potential_hex_endpoint(region_id: int, geojson_data: dict):
     try:
         gdfs = {eng_obj: engineer_potential_service.fetch_required_objects(region_id, pot_ids) for eng_obj, pot_ids in engineer_potential_service.ENG_OBJ.items()}
         combined_gdf = engineer_potential_service.combine_engineering_gdfs(gdfs)
@@ -68,7 +64,7 @@ async def engineer_potential_hex_endpoint(region_id: int, geojson_data: dict, to
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post('/{region_id}/evaluate_project')
-async def save_engineer_potential_endpoint(region_id: int, background_tasks: BackgroundTasks, token: str = Depends(verify_token), project_scenario_id: int = Query(...)):
+async def save_engineer_potential_endpoint(region_id: int, background_tasks: BackgroundTasks, project_scenario_id: int, token: str = Depends(verify_token)):
     
     background_tasks.add_task(engineer_potential_service.process_engineer, region_id, project_scenario_id, token)
-    return {"message": "Processing started.", "status": "processing"}
+    return EVALUATION_RESPONSE_MESSAGE
