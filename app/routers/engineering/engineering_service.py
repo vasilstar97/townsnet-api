@@ -136,7 +136,7 @@ async def process_region_evaluation(
                     indicator_data = {
                         "indicator_id": indicator_id,
                         "territory_id": row["territory_id"],
-                        "date_type": "year",
+                        "date_type": "day",
                         "date_value": datetime.now().strftime("%Y-%m-%d"),
                         "value": value,
                         "value_type": "real",
