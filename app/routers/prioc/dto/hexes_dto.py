@@ -1,16 +1,16 @@
 from pydantic import BaseModel, Field
-from typing import LiteralString
+from typing import Literal
 
 
 class HexesDTO(BaseModel):
 
-    territory: int = Field(
+    territory_id: int = Field(
         ...,
-        examples=[""],
+        examples=[1],
         description="Territory id to calculate hexes priority"
     )
 
-    object_type: LiteralString[
+    object_type: Literal[
         "Медицинский комплекс",
         "Бизнес-кластер",
         "Пром объект",
@@ -20,5 +20,6 @@ class HexesDTO(BaseModel):
         "Тур база",
     ] = Field(
         ...,
+        examples=["Тур база"],
         description="Possible object to place in territory"
     )

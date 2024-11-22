@@ -1,43 +1,53 @@
+import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from typing import Annotated
 
+from app.common.utils import decorators
 from .dto import HexesDTO, TerritoryDTO
-from app.utils import decorators
+from .services.prioc_service import prioc_service
+
+
+async def on_startup():
+    ...
+
+async def on_shutdown():
+    ...
 
 router = APIRouter(prefix="/prioc", tags=["Priority object calculation"])
 
 
 @router.get("/object")
-@decorators.gdf_to_geojson
+# @decorators.gdf_to_geojson
 async def get_object_hexes(
-        hex_params: HexesDTO = Annotated[HexesDTO, Depends(HexesDTO)]
+        hex_params: Annotated[HexesDTO, Depends(HexesDTO)]
 ) -> dict:
     """
     Calculate hexes to place priority objects with estimation value
     """
 
-    return hex_params.__dict__
+    result = await prioc_service.get_hexes_for_object(hex_params)
+    return json.loads(result.to_json(to_wgs84=True))
 
 @router.get("/cluster")
 @decorators.gdf_to_geojson
 async def get_hexes_clusters(
-        hex_params: HexesDTO = Annotated[HexesDTO, Depends(HexesDTO)]
+        hex_params: Annotated[HexesDTO, Depends(HexesDTO)]
 ) -> dict:
     """
     Calculate hexes clusters to place priority objects with estimation value
     """
 
-    return get_object_hexes.__dict__
+    result = await prioc_service.get_hex_clusters_for_object(hex_params)
+    return json.loads(result.to_json(to_wgs84=True))
 
 @router.post("/territory")
-@decorators.gdf_to_geojson
 async def get_territory_value(
-        territory_params: TerritoryDTO = Annotated[TerritoryDTO, Depends(TerritoryDTO)]
+        territory_params: TerritoryDTO
 ) -> dict:
     """
     Calculate possible priority objects allocation
     """
 
-    return territory_params.__dict__
+    result = await prioc_service.get_territory_estimation(territory_params)
+    return result
