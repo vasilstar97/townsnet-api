@@ -3,6 +3,11 @@ import geopandas as gpd
 from townsnet.engineering.engineering_model import EngineeringModel, EngineeringObject
 from ...utils import api_client
 from .engineering_models import Indicator, PhysicalObjectType
+from ...utils.const import EVALUATION_RESPONSE_MESSAGE, URBAN_API
+from datetime import datetime
+import requests
+from app.utils.auth import verify_token 
+from loguru import logger
 
 ENG_OBJ_POTS = {
     EngineeringObject.ENGINEERING_OBJECT: [],
@@ -84,3 +89,69 @@ def aggregate(engineering_model : EngineeringModel, units : gpd.GeoDataFrame) ->
     agg = engineering_model.aggregate(units)
     return agg
     # return {i : {ENG_OBJ_INDICATOR[eng_obj] : agg.loc[i, eng_obj.value] for eng_obj in list(EngineeringObject)} for i in agg.index}
+
+async def process_region_evaluation(
+    region_id: int, 
+    regional_scenario_id: int | None, 
+    token: str
+):
+    try:
+        levels = [2]
+        indicators = [
+            {"indicator_id": 88, "column": None},
+            {"indicator_id": 89, "column": "Электростанция"},
+            {"indicator_id": 90, "column": "Водозабор"},
+            {"indicator_id": 91, "column": "Водоочистительное сооружение"},
+            {"indicator_id": 92, "column": "Водохранилище"},
+            {"indicator_id": 93, "column": "Газораспределительная станция"}
+        ]
+
+        engineering_model = await fetch_engineering_model(region_id)
+
+        for level in levels:
+            units = await fetch_units(region_id, level)
+            engineer = aggregate(engineering_model, units)
+            engineer = engineer.reset_index()  
+
+            for indicator in indicators:
+                indicator_id = indicator["indicator_id"]
+                column = indicator["column"]
+
+                for _, row in engineer.iterrows():
+                    if column:
+                        value = float(row.get(column, 0))
+                    else:
+                        value = sum(
+                            float(row.get(col, 0)) for col in [
+                                "Электростанция",
+                                "Водозабор",
+                                "Водоочистительное сооружение",
+                                "Водохранилище",
+                                "Газораспределительная станция"
+                            ]
+                        )
+
+                    indicator_data = {
+                        "indicator_id": indicator_id,
+                        "territory_id": row["territory_id"],
+                        "date_type": "year",
+                        "date_value": datetime.now().strftime("%Y-%m-%d"),
+                        "value": value,
+                        "value_type": "real",
+                        "information_source": "modeled TownsNet"
+                    }
+                    print(indicator_data)
+
+                    response = requests.post(
+                        f"{URBAN_API}/api/v1/indicator_value",
+                        json=indicator_data
+                    )
+
+                    if response.status_code not in (200, 201, 500):
+                        logger.error(
+                            f"Error saving indicators: {response.status_code}, Response body: {response.text}"
+                        )
+                        raise Exception("Error saving indicators")
+
+    except Exception as e:
+        logger.error(f"Error during region evaluation: {e}")

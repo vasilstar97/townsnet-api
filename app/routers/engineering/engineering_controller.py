@@ -4,7 +4,9 @@ from townsnet.engineering.engineer_potential import InfrastructureAnalyzer
 from pydantic_geojson import FeatureCollectionModel, PolygonModel, MultiPolygonModel
 from ...utils import decorators
 from . import engineering_service, engineering_models, engineer_potential_service
-from ...utils.const import EVALUATION_RESPONSE_MESSAGE
+from ...utils.const import EVALUATION_RESPONSE_MESSAGE, URBAN_API
+from datetime import datetime
+import requests
 from app.utils.auth import verify_token 
 import geopandas as gpd
 from loguru import logger
@@ -34,19 +36,17 @@ async def get_evaluation(region_id : int, level : int) -> engineering_models.Eng
     units = await engineering_service.fetch_units(region_id, level)
     return engineering_service.aggregate(engineering_model, units)
 
-# @router.post('/{region_id}/evaluate_geojson')
-# async def evaluate_geojson(region_id : int, regional_scenario_id : int | None = None):
-#     return EVALUATION_RESPONSE_MESSAGE
+@router.post("/{region_id}/evaluate_region")
+async def evaluate_region_endpoint(
+    region_id: int,
+    regional_scenario_id: int | None = None,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    token: str = Depends(verify_token)
+):
+    background_tasks.add_task(engineering_service.process_region_evaluation, region_id, regional_scenario_id, token)
+    return {"message": "Region evaluation started", "status": "processing"}
 
-# @router.post('/{region_id}/evaluate_project')
-# async def evaluate_project(region_id : int, project_polygon : PolygonModel | MultiPolygonModel, project_scenario_id : int, regional_scenario_id : int | None, ):
-#     return EVALUATION_RESPONSE_MESSAGE
 
-@router.post('/{region_id}/evaluate_region')
-async def evaluate_region(region_id : int, regional_scenario_id : int | None = None):
-    return EVALUATION_RESPONSE_MESSAGE
-
-# API Endpoints
 @router.post('/{region_id}/evaluate_geojson')
 async def engineer_potential_hex_endpoint(region_id: int, geojson_data: dict, token: str = Depends(verify_token)):
     try:
