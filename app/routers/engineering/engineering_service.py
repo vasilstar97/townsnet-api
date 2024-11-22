@@ -98,6 +98,7 @@ async def process_region_evaluation(
 ):
     try:
         levels = [2, 3, 4]
+        # levels = [2]
         indicators = [
             {"indicator_id": 88, "column": None},
             {"indicator_id": 89, "column": "Электростанция"},
@@ -136,7 +137,7 @@ async def process_region_evaluation(
                         "indicator_id": indicator_id,
                         "territory_id": row["territory_id"],
                         "date_type": "year",
-                        "date_value": "2024-01-01",
+                        "date_value": datetime.now().strftime("%Y-%m-%d"),
                         "value": value,
                         "value_type": "real",
                         "information_source": "modeled TownsNet"
