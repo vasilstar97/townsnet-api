@@ -107,7 +107,7 @@ async def get_project_by_id(project_id : int, token : str):
     return res.json()
 
 async def post_scenario_indicator(indicator_id : int, scenario_id : int, value : float, token : str, comment : str = '-'):
-    res = await ra.post(URBAN_API + f'/api/v1/scenarios/{scenario_id}/indicators_values', headers={'Authorization': f'Bearer {token}'}, json={
+    res = await ra.post(URBAN_API + f'/api/v1/scenarios/indicators_values', headers={'Authorization': f'Bearer {token}'}, json={
         "indicator_id": indicator_id,
         "scenario_id": scenario_id,
         "territory_id": None,

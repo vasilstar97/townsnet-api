@@ -73,11 +73,11 @@ async def get_evaluation(region_id : int, level : int | None = None, category : 
     return provision
 
 @router.post('/{region_id}/get_evaluation')
-async def get_geojson_evaluation(region_id : int, geojson : provision_models.GridInputModel, regional_scenario_id : int | None = None) -> list[int]:
+async def get_geojson_evaluation(region_id : int, geojson : provision_models.GridInputModel, regional_scenario_id : int | None = None) -> list[float]:
     
     grid_gdf = gpd.GeoDataFrame.from_features([f.model_dump() for f in geojson.features], crs=4326)
 
-    social_model = provision_service.fetch_social_model(region_id, regional_scenario_id)
+    social_model = await provision_service.fetch_social_model(region_id, regional_scenario_id)
 
     logger.info('Evaluating social score for each cell')
     return grid_gdf.geometry.apply(lambda g : provision_service.evaluate_social(social_model, g)[0])

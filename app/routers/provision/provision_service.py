@@ -184,7 +184,7 @@ def _get_interpretation(evaluations_df : pd.DataFrame) -> str:
     worst = evaluations_df.tail(3)
     return f'Лучшая оценка: {_df_to_text(best)}. Худшая оценка: {_df_to_text(worst)}'
 
-def evaluate_social(social_model : SocialModel, project_geometry : Polygon | MultiPolygon) -> tuple[int, dict[Category, float]] :
+def evaluate_social(social_model : SocialModel, project_geometry : Polygon | MultiPolygon) -> tuple[int, dict[Category, float], str] :
     
     # calculating max possible scores
     service_types = social_model.provisions.keys()
@@ -206,13 +206,12 @@ def evaluate_social(social_model : SocialModel, project_geometry : Polygon | Mul
     evaluations_df['score'] = evaluations_df['provision']*evaluations_df['weight']
 
     interpretation = _get_interpretation(evaluations_df)
-    logger.info(interpretation)
     
     # aggregate by category
     categories_dfs = {category : evaluations_df[evaluations_df['category'] == category.name] for category in list(Category)}
-    categories_scores = {category : round(CATEGORIES_WEIGHTS[category]*(category_df['score'].sum())/max_possible_scores[category], 2) for category, category_df in categories_dfs.items()}
+    categories_scores = {category : round(CATEGORIES_WEIGHTS[category]*(category_df['score'].sum())/max_possible_scores[category], 1) for category, category_df in categories_dfs.items()}
 
-    return round(sum(categories_scores.values()),1), categories_scores
+    return round(sum(categories_scores.values()),1), categories_scores, interpretation
 
 async def fetch_regional_scenario_id(project_scenario_id : int):
     return None # FIXME исправить когда появятся сценарии
@@ -223,16 +222,19 @@ async def fetch_project_geometry(project_scenario_id : int, token : str):
     geometry_json = json.dumps(project_info['geometry'])
     return shapely.from_geojson(geometry_json)
 
-async def _save_project_indicators(project_scenario_id : int, social_score : int, categories_scores : int, description : str, token : str):
+async def _save_project_indicators(project_scenario_id : int, social_score : int, categories_scores : int, comment : str, token : str):
     # TODO доделать
     indicators_mapping = {
         SOCIAL_INDICATOR_ID : social_score,
         **{CATEGORIES_INDICATORS_IDS[category] : score for category, score in categories_scores.items()}
     }
     for indicator_id, value in indicators_mapping.items():
-        res = await api_client.post_scenario_indicator(indicator_id, project_scenario_id, value, token)
+        if indicator_id == SOCIAL_INDICATOR_ID:
+            res = await api_client.post_scenario_indicator(indicator_id, project_scenario_id, value, token, comment)
+        else:
+            res = await api_client.post_scenario_indicator(indicator_id, project_scenario_id, value, token)
         status = res.status_code
-        if status == 200:
+        if status in [200, 201]:
             logger.success(f'{indicator_id} -> {value}')
         else:
             logger.error(f'{indicator_id} -> {value}')
@@ -248,7 +250,7 @@ async def evaluate_and_save_project(region_id : int, project_scenario_id : int, 
     project_geometry = await fetch_project_geometry(project_scenario_id, token)
     social_model = await fetch_social_model(region_id, regional_scenario_id)
     logger.info('Evaluating social score')
-    social_score, categories_scores = evaluate_social(social_model, project_geometry)
+    social_score, categories_scores, interpretation = evaluate_social(social_model, project_geometry)
     logger.info('Saving indicators')
-    await _save_project_indicators(project_scenario_id, social_score, categories_scores, 'description', token)
+    await _save_project_indicators(project_scenario_id, social_score, categories_scores, interpretation, token)
 
