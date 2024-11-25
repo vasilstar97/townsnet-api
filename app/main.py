@@ -4,13 +4,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 # from townsnet import SERVICE_TYPES, Territory
 # from .utils import REGIONS_DICT, get_provision, get_region, process_output, process_territory
-from .utils import api_client
+from .common.utils import api_client
 from .routers.engineering import engineering_controller
 from .routers.provision import provision_controller
 from .routers.hex import hex_controller
+from .routers.prioc import prioc_controller
 from contextlib import asynccontextmanager
 
-controllers = [engineering_controller, provision_controller, hex_controller]
+controllers = [engineering_controller, provision_controller, hex_controller, prioc_controller]
 
 async def on_startup():
     for controller in controllers:

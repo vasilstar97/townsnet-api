@@ -10,8 +10,12 @@ from townsnet.provision.service_type import ServiceType, SupplyType, Category
 from townsnet.provision.provision_model import ProvisionModel
 from townsnet.provision.social_model import SocialModel
 from shapely import Polygon, MultiPolygon
-from ...utils import api_client
-from ...utils.const import DATA_PATH
+from app.common.utils import api_client
+from app.common.config.config import config
+
+
+DATA_PATH = config.get("DATA_PATH")
+
 
 CATEGORIES_WEIGHTS = {
     Category.BASIC: 3,

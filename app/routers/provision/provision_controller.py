@@ -1,15 +1,16 @@
 import geopandas as gpd
-import pandas as pd
-import os
 from loguru import logger
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Request
-from townsnet.provision.service_type import ServiceType, Category, SupplyType
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
+from townsnet.provision.service_type import ServiceType, Category
 from townsnet.provision.provision_model import ProvisionModel
-from townsnet.provision.social_model import SocialModel
-from pydantic_geojson import PolygonModel, MultiPolygonModel
-from ...utils import decorators, api_client
-from ...utils.const import DATA_PATH, EVALUATION_RESPONSE_MESSAGE
+from app.common.utils import decorators, api_client
+from app.common.config.config import config
 from . import provision_service, provision_models
+
+
+EVALUATION_RESPONSE_MESSAGE = config.get("EVALUATION_RESPONSE_MESSAGE")
+
+
 
 async def on_startup():
     logger.info('Fetching regions')
