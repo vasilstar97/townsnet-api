@@ -1,7 +1,7 @@
 import pandas as pd
 import geopandas as gpd
 from townsnet.engineering.engineering_model import EngineeringModel, EngineeringObject
-from app.common.utils import api_client
+from ...utils import api_client
 from .engineering_models import Indicator, PhysicalObjectType
 
 ENG_OBJ_POTS = {

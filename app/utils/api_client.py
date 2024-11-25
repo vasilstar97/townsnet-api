@@ -5,11 +5,8 @@ import requests_async as ra
 import pandas as pd
 import geopandas as gpd
 from datetime import date
-from app.common.config.config import config
+from .const import URBAN_API, TRANSPORT_FRAMES_API, DEFAULT_CRS
 
-URBAN_API = config.get("URBAN_API")
-TRANSPORT_FRAMES_API = config.get("TRANSPORT_FRAMES_API")
-DEFAULT_CRS = config.get("DEFAULT_CRS")
 PAGE_SIZE = 10_000
 POPULATION_COUNT_INDICATOR_ID = 1
 GRAPH_TYPE = 'inter'

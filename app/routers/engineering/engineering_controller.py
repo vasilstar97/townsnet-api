@@ -1,12 +1,9 @@
-from fastapi import APIRouter
-from pydantic_geojson import PolygonModel, MultiPolygonModel
-from app.common.utils import decorators
-from app.common.config.config import config
+from fastapi import APIRouter, HTTPException, Depends
+from townsnet.engineering.engineering_model import EngineeringModel, EngineeringObject
+from pydantic_geojson import FeatureCollectionModel, PolygonModel, MultiPolygonModel
+from ...utils import decorators
 from . import engineering_service, engineering_models
-
-
-EVALUATION_RESPONSE_MESSAGE = config.get("EVALUATION_RESPONSE_MESSAGE")
-
+from ...utils.const import EVALUATION_RESPONSE_MESSAGE
 
 async def on_startup():
     ...
