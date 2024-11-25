@@ -3,12 +3,7 @@ townsnet @ git+https://github.com/vasilstar97/townsnet.git@develop
 fastapi>=0.111.0,<0.113.0
 pydantic>=2.0.0,<3.0.0
 pydantic-geojson==0.1.1
-loguru~=0.7.2
+loguru
 requests-async
 pyarrow==12.0.0
 numpy==1.23.5
-python-dotenv~=1.0.1
-minio~=7.2.11
-pyproj~=3.7.0
-hdbscan~=0.8.40
-networkx~=3.4.2

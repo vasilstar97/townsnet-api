@@ -1,7 +1,6 @@
 import geopandas as gpd
 from townsnet.potential.grid_generator import GridGenerator
-from app.common.utils import api_client
-
+from ...utils import api_client
 
 async def _fetch_region_gdf(region_id : int):
     regions = await api_client.get_regions(True)
