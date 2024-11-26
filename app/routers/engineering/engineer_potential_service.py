@@ -20,11 +20,21 @@ class EngineeringObject(Enum):
 PAGE_SIZE = 10_000
 
 ENG_OBJ = {
-    EngineeringObject.POWER_SUPPLY: [14, 20, 21, 33, 34, 35],
-    EngineeringObject.HEAT_SUPPLY: [41],
-    EngineeringObject.GAS_SUPPLY: [13, 18],
-    EngineeringObject.WATER_SUPPLY: [27, 38, 40, 42],
-    EngineeringObject.WATER_DRAINAGE: [24, 37, 39]
+    EngineeringObject.POWER_SUPPLY: [
+        14, 20, 21, 33, 34, 35, 12, 53 # Электрические подстанции, ЛЭП, электростанции, генераторы, и объекты электроснабжения
+    ],
+    EngineeringObject.HEAT_SUPPLY: [
+        41, 11, 56, 58  # Котельная и объекты теплоснабжения
+    ],
+    EngineeringObject.GAS_SUPPLY: [
+        13, 18, 59  # Магистральные газопроводы, объекты добычи и транспортировки газа
+    ],
+    EngineeringObject.WATER_SUPPLY: [
+        27, 38, 40, 42, 13  # Сети водоснабжения, водонапорные башни, водозаборные и насосные станции
+    ],
+    EngineeringObject.WATER_DRAINAGE: [
+        24, 37, 39, 14  # Сети водоотведения, сооружения для очистки воды, водоочистные сооружения
+    ]
 }
 
 # Utility Functions

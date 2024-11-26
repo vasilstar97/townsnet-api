@@ -37,8 +37,9 @@ async def get_evaluation(region_id : int, level : int) -> engineering_models.Eng
 async def evaluate_region_endpoint(
     region_id: int,
     regional_scenario_id: int | None = None,
-    background_tasks: BackgroundTasks = BackgroundTasks()
-):
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    token: str = Depends(verify_token)
+    ):
     background_tasks.add_task(engineering_service.process_region_evaluation, region_id, regional_scenario_id, token)
     return EVALUATION_RESPONSE_MESSAGE
 

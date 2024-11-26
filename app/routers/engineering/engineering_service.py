@@ -12,11 +12,21 @@ from loguru import logger
 
 ENG_OBJ_POTS = {
     EngineeringObject.ENGINEERING_OBJECT: [],
-    EngineeringObject.POWER_PLANTS: [21, 33, 34, 35],
-    EngineeringObject.WATER_INTAKE: [38, 40],
-    EngineeringObject.WATER_TREATMENT: [37, 39],
-    EngineeringObject.WATER_RESERVOIR: [],
-    EngineeringObject.GAS_DISTRIBUTION: [],
+    EngineeringObject.POWER_PLANTS: [
+        21, 33, 34, 35, 12
+    ],
+    EngineeringObject.WATER_INTAKE: [
+        38, 40, 42
+    ],
+    EngineeringObject.WATER_TREATMENT: [
+        37, 39, 14 
+    ],
+    EngineeringObject.WATER_RESERVOIR: [
+        45, 54, 55
+    ],
+    EngineeringObject.GAS_DISTRIBUTION: [
+        13, 18, 59, 41, 56, 58  
+    ]
 }
 
 ENG_OBJ_INDICATOR = {
