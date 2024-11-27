@@ -1,4 +1,4 @@
-townsnet @ git+https://github.com/vasilstar97/townsnet.git@develop
+townsnet @ git+https://github.com/vasilstar97/townsnet.git@engineer
 # townsnet==0.0.4
 fastapi>=0.111.0,<0.113.0
 pydantic>=2.0.0,<3.0.0

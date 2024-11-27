@@ -10,7 +10,7 @@ from .routers.provision import provision_controller
 from .routers.hex import hex_controller
 from contextlib import asynccontextmanager
 
-controllers = [engineering_controller, provision_controller, hex_controller]
+controllers = [provision_controller, engineering_controller, hex_controller]
 
 async def on_startup():
     for controller in controllers:
