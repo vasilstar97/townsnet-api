@@ -33,7 +33,7 @@ async def get_evaluation(region_id : int, level : int) -> engineering_models.Eng
     units = await engineering_service.fetch_units(region_id, level)
     return engineering_service.aggregate(engineering_model, units)
 
-@router.post("/{region_id}/evaluate_region")
+@router.put("/{region_id}/evaluate_region")
 async def evaluate_region_endpoint(
     region_id: int,
     regional_scenario_id: int | None = None,
@@ -64,7 +64,7 @@ async def engineer_potential_hex_endpoint(region_id: int, geojson_data: dict):
         logger.error(f"Error in engineer potential calculation: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.post('/{region_id}/evaluate_project')
+@router.put('/{region_id}/evaluate_project')
 async def save_engineer_potential_endpoint(region_id: int, background_tasks: BackgroundTasks, project_scenario_id: int, token: str = Depends(verify_token)):
     
     background_tasks.add_task(engineer_potential_service.process_engineer, region_id, project_scenario_id, token)

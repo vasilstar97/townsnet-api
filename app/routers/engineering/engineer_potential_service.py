@@ -36,7 +36,6 @@ ENG_OBJ = {
         24, 37, 39, 14  # Сети водоотведения, сооружения для очистки воды, водоочистные сооружения
     ]
 }
-
 # Utility Functions
 def fetch_physical_objects(region_id: int, pot_id: int, page: int, page_size: int = PAGE_SIZE):
     response = requests.get(
@@ -103,10 +102,13 @@ def analyze_and_save_results(analyzer: InfrastructureAnalyzer, project_scenario_
             "hexagon_id": None,
             "value": float(res['score']),
             "comment": '_',
-            "information_source": "modeled"
+            "information_source": "modeled",
+             "properties": {
+                "attribute_name": "Обеспечение инженерной инфраструктурой"
+            }
         }
 
-        response = requests.post(
+        response = requests.put(
             f"{URBAN_API}/api/v1/scenarios/indicators_values",
             headers={"Authorization": f"Bearer {token}"},
             json=indicator_data
