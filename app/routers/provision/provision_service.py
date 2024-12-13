@@ -229,16 +229,15 @@ async def _save_project_indicators(project_scenario_id : int, social_score : int
         **{CATEGORIES_INDICATORS_IDS[category] : score for category, score in categories_scores.items()}
     }
     for indicator_id, value in indicators_mapping.items():
-        if indicator_id == SOCIAL_INDICATOR_ID:
-            res = await api_client.post_scenario_indicator(indicator_id, project_scenario_id, value, token, comment)
-        else:
-            res = await api_client.post_scenario_indicator(indicator_id, project_scenario_id, value, token)
-        status = res.status_code
-        if status in [200, 201]:
+        try:
+            if indicator_id == SOCIAL_INDICATOR_ID:
+                res = await api_client.put_scenario_indicator(indicator_id, project_scenario_id, value, token, comment)
+            else:
+                res = await api_client.put_scenario_indicator(indicator_id, project_scenario_id, value, token)
             logger.success(f'{indicator_id} -> {value}')
-        else:
+        except Exception as e:
             logger.error(f'{indicator_id} -> {value}')
-            logger.info(res.text)
+            logger.error(str(e))
     # logger.success(f'project_scenario #{project_scenario_id} -> {SOCIAL_INDICATOR_ID} : {social_score}')
     # for category, score in categories_scores.items():
     #     indicator_id = CATEGORIES_INDICATORS_IDS[category]
