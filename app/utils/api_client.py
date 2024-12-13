@@ -106,16 +106,18 @@ async def get_project_by_id(project_id : int, token : str):
     res = await ra.get(URBAN_API + f'/api/v1/projects/{project_id}/territory', headers={'Authorization': f'Bearer {token}'}, verify=False)
     return res.json()
 
-async def post_scenario_indicator(indicator_id : int, scenario_id : int, value : float, token : str, comment : str = '-'):
-    res = await ra.post(URBAN_API + f'/api/v1/scenarios/indicators_values', headers={'Authorization': f'Bearer {token}'}, json={
+async def put_scenario_indicator(indicator_id : int, scenario_id : int, value : float, token : str, comment : str = '-'):
+    res = await ra.put(URBAN_API + f'/api/v1/scenarios/indicators_values', headers={'Authorization': f'Bearer {token}'}, json={
         "indicator_id": indicator_id,
         "scenario_id": scenario_id,
         "territory_id": None,
         "hexagon_id": None,
         "value": value,
         "comment": comment,
-        "information_source": INDICATOR_INFORMATION_SOURCE
+        "information_source": INDICATOR_INFORMATION_SOURCE,
+        "properties": {}
     }, verify=False)
+    res.raise_for_status()
     return res
 
 async def post_territory_indicator(indicator_id : int, territory_id : int, value : float):

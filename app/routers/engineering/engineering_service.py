@@ -19,13 +19,13 @@ ENG_OBJ_POTS = {
         38, 40, 42
     ],
     EngineeringObject.WATER_TREATMENT: [
-        37, 39, 14 
+        37, 39, 14
     ],
     EngineeringObject.WATER_RESERVOIR: [
         45, 54, 55
     ],
     EngineeringObject.GAS_DISTRIBUTION: [
-        13, 18, 59, 41, 56, 58  
+        13, 18, 59, 41, 56, 58
     ]
 }
 
@@ -123,7 +123,7 @@ async def process_region_evaluation(
         for level in levels:
             units = await fetch_units(region_id, level)
             engineer = aggregate(engineering_model, units)
-            engineer = engineer.reset_index()  
+            engineer = engineer.reset_index()
 
             for indicator in indicators:
                 indicator_id = indicator["indicator_id"]
@@ -152,9 +152,8 @@ async def process_region_evaluation(
                         "value_type": "real",
                         "information_source": "modeled TownsNet"
                     }
-                    print(indicator_data)
 
-                    response = requests.post(
+                    response = requests.put(
                         f"{URBAN_API}/api/v1/indicator_value",
                         json=indicator_data
                     )
