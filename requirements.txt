@@ -4,6 +4,6 @@ fastapi>=0.111.0,<0.113.0
 pydantic>=2.0.0,<3.0.0
 pydantic-geojson==0.1.1
 loguru
-requests-async
+requests-async @ git+https://github.com/encode/requests-async@master
 pyarrow==12.0.0
 numpy==1.23.5

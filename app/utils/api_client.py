@@ -87,7 +87,7 @@ async def get_service_types(territory_id : int) -> list[dict]:
     return res.json()
 
 async def get_normatives(territory_id : int) -> list[dict]:
-    res = await ra.get(URBAN_API + f'/api/v1/territory/{territory_id}/normatives', verify=False)
+    res = await ra.get(URBAN_API + f'/api/v1/territory/{territory_id}/normatives', params={'year':2024}, verify=False)
     return res.json()
 
 async def get_physical_objects_types() -> list[dict]:
