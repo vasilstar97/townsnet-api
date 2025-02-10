@@ -94,28 +94,29 @@ def retrieve_project_and_territory(project_scenario_id: int, token: str):
 
 def analyze_and_save_results(analyzer: InfrastructureAnalyzer, project_scenario_id: int, token: str):
     results = analyzer.get_results()
-    for res in results.to_dict("records"):
-        indicator_data = {
-            "indicator_id": 204,
-            "scenario_id": project_scenario_id,
-            "territory_id": None,
-            "hexagon_id": None,
-            "value": float(res['score']),
-            "comment": '_',
-            "information_source": "modeled",
-             "properties": {
-                "attribute_name": "Обеспечение инженерной инфраструктурой"
-            }
-        }
+    logger.info(results)
+    # for res in results.to_dict("records"):
+    #     indicator_data = {
+    #         "indicator_id": 204,
+    #         "scenario_id": project_scenario_id,
+    #         "territory_id": None,
+    #         "hexagon_id": None,
+    #         "value": float(res['score']),
+    #         "comment": '_',
+    #         "information_source": "modeled",
+    #          "properties": {
+    #             "attribute_name": "Обеспечение инженерной инфраструктурой"
+    #         }
+    #     }
 
-        response = requests.put(
-            f"{URBAN_API}/api/v1/scenarios/indicators_values",
-            headers={"Authorization": f"Bearer {token}"},
-            json=indicator_data
-        )
-        if response.status_code not in (200, 201):
-            logger.error(f"Error saving indicators: {response.status_code}, Response body: {response.text}")
-            raise Exception("Error saving indicators")
+    #     response = requests.put(
+    #         f"{URBAN_API}/api/v1/scenarios/indicators_values",
+    #         headers={"Authorization": f"Bearer {token}"},
+    #         json=indicator_data
+    #     )
+    #     if response.status_code not in (200, 201):
+    #         logger.error(f"Error saving indicators: {response.status_code}, Response body: {response.text}")
+    #         raise Exception("Error saving indicators")
 
 async def process_engineer(region_id: int, project_scenario_id: int, token: str):
     try:
@@ -130,6 +131,8 @@ async def process_engineer(region_id: int, project_scenario_id: int, token: str)
         polygon_gdf = gpd.GeoDataFrame.from_features([territory_feature], crs=4326)
         polygon_gdf = polygon_gdf.to_crs(combined_gdf.crs)
         analyzer = InfrastructureAnalyzer(combined_gdf, polygon_gdf)
+        combined_gdf.to_parquet('combined_gdf.parquet')
+        polygon_gdf.to_parquet('polygon_gdf.parquet')
         analyze_and_save_results(analyzer, project_scenario_id, token)
     except Exception as e:
         logger.error(f"Error during engineer processing: {e}")
